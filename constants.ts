@@ -6,7 +6,13 @@ export const GLOBAL_REFRESH_RATE = 2000;
 // --- INFRASTRUCTURE CONFIG ---
 export const ADMIN_WALLET_ADDRESS = 'UQAx408EfLCH0JZWxffL1c5aMSSFpNcgXLW_ezucTOqOE0_V';
 export const APP_DOMAIN = 'chatgpt-helper.ru';
-export const APP_URL = `https://${APP_DOMAIN}`;
+
+// DYNAMIC URL LOGIC:
+// If running in browser, use current address (IP or Domain). 
+// This fixes the issue where the app can't reach the API if accessed via IP:3000
+export const APP_URL = (typeof window !== 'undefined' && window.location) 
+  ? window.location.origin 
+  : `https://${APP_DOMAIN}`;
 
 // Blockchain Parameters (NeuroCoin Spec)
 export const TARGET_BLOCK_TIME = 360; // 6 Minutes (360 seconds)
