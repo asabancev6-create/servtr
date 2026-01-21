@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>NeuroCoin</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              neuro: {
+                bg: '#000000',
+                'bg-secondary': '#0a0a0a',
+                violet: '#8D73FF', // Primary
+                cyan: '#00F0FF',   // Secondary
+                pink: '#FF00E5',   // Accent
+                gold: '#FFB800',
+                glass: 'rgba(255, 255, 255, 0.03)',
+              }
+            },
+            backgroundImage: {
+              'neuro-gradient-primary': 'linear-gradient(135deg, #00F0FF 0%, #8D73FF 50%, #FF00E5 100%)',
+              'neuro-gradient-secondary': 'linear-gradient(135deg, #8D73FF 0%, #FF00E5 100%)',
+              'neuro-gradient-gold': 'linear-gradient(135deg, #FFB800 0%, #FF8A00 100%)',
+              'plasma': 'conic-gradient(from 0deg, transparent 0deg, #00F0FF 90deg, transparent 180deg, #8D73FF 270deg, transparent 360deg)',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['Rajdhani', 'monospace'],
+            },
+            boxShadow: {
+              'glow': '0 0 40px rgba(141, 115, 255, 0.3)',
+              'glow-strong': '0 0 60px rgba(141, 115, 255, 0.5)',
+              'card': '0 8px 32px rgba(0, 0, 0, 0.4)',
+              'core': '0 0 50px rgba(0, 240, 255, 0.2), inset 0 0 30px rgba(0, 240, 255, 0.1)',
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+              'pulse-slow': 'pulse 3s ease-in-out infinite',
+              'spin-slow': 'spin 15s linear infinite',
+              'spin-reverse': 'spinReverse 3s linear infinite',
+              'gyro-x': 'gyroX 10s linear infinite',
+              'gyro-y': 'gyroY 12s linear infinite',
+              'gyro-z': 'gyroZ 15s linear infinite',
+              'gyro-diag-a': 'gyroDiagA 9s linear infinite',
+              'gyro-diag-b': 'gyroDiagB 11s linear infinite',
+              'warp': 'warp 1s linear infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              spinReverse: {
+                '0%': { transform: 'rotate(360deg)' },
+                '100%': { transform: 'rotate(0deg)' },
+              },
+              gyroX: {
+                '0%': { transform: 'rotateX(0deg) rotateY(0deg) rotateZ(0deg)' },
+                '100%': { transform: 'rotateX(360deg) rotateY(180deg) rotateZ(0deg)' },
+              },
+              gyroY: {
+                '0%': { transform: 'rotateX(0deg) rotateY(0deg)' },
+                '100%': { transform: 'rotateX(0deg) rotateY(360deg)' },
+              },
+              gyroZ: {
+                '0%': { transform: 'rotateZ(0deg)' },
+                '100%': { transform: 'rotateZ(360deg)' },
+              },
+              gyroDiagA: {
+                '0%': { transform: 'rotate3d(1, 1, 0, 0deg)' },
+                '100%': { transform: 'rotate3d(1, 1, 0, 360deg)' },
+              },
+              gyroDiagB: {
+                '0%': { transform: 'rotate3d(-1, 1, 0.5, 0deg)' },
+                '100%': { transform: 'rotate3d(-1, 1, 0.5, 360deg)' },
+              },
+              warp: {
+                '0%': { transform: 'translateZ(-1000px)', opacity: '0' },
+                '20%': { opacity: '1' },
+                '90%': { opacity: '1' },
+                '100%': { transform: 'translateZ(500px)', opacity: '0' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --tg-viewport-height: 100vh;
+        --tg-viewport-stable-height: 100vh;
+      }
+
+      html, body {
+        background-color: #000000;
+        color: #FFFFFF;
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0a0a0a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #8D73FF; 
+        border-radius: 2px;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(141, 115, 255, 0.2);
+      }
+      .gradient-text {
+        background: linear-gradient(135deg, #00F0FF 0%, #8D73FF 50%, #FF00E5 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      /* 3D Utilities */
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+      .perspective-1000 {
+        perspective: 1000px;
+      }
+      .perspective-500 {
+        perspective: 500px;
+      }
+      .backface-hidden {
+        backface-visibility: hidden;
+      }
+      
+      button {
+        touch-action: manipulation;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
