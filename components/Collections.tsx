@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { COLLECTIONS, APP_URL } from '../constants';
+import { COLLECTIONS } from '../constants';
 import { Box, Key, Brain, Cpu, Lock, Gem, CheckCircle2, Clipboard, Share2, Users, Coins, Gift, Calendar, ArrowRight, AlertTriangle, Clock } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { GameService } from '../services/mockBackend';
@@ -113,7 +113,7 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
   };
 
   const copyReferral = () => {
-      const refLink = `${APP_URL}/?start=ref_${window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '123'}`;
+      const refLink = `https://t.me/neurocoin_bot?start=ref_${window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '123'}`;
       navigator.clipboard.writeText(refLink);
       setCopied(true);
       if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -284,7 +284,7 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
 
                    <div className="bg-black/40 rounded-xl p-2 flex items-center justify-between border border-white/10 mb-2">
                        <span className="text-[10px] text-slate-500 font-mono px-2 truncate max-w-[200px]">
-                            {APP_URL}/?start=ref_{window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '...'}
+                            https://t.me/neurocoin_bot?start=ref_{window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '...'}
                        </span>
                        <button 
                          onClick={copyReferral}
@@ -296,7 +296,7 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
                    
                    <button 
                         onClick={() => {
-                            const link = `https://t.me/share/url?url=${APP_URL}/?start=ref_${window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '123'}&text=Join NeuroCoin and mine crypto!`;
+                            const link = `https://t.me/share/url?url=https://t.me/neurocoin_bot?start=ref_${window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '123'}&text=Join NeuroCoin and mine crypto!`;
                             window.open(link, '_blank');
                         }}
                         className="w-full py-3 bg-neuro-cyan text-black font-bold rounded-xl shadow-[0_0_15px_rgba(0,240,255,0.5)] flex items-center justify-center gap-2 hover:brightness-110 transition-all"

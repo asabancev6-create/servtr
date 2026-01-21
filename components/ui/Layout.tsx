@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Pickaxe, ShoppingBag, Wallet, UserCircle2, Activity, Gem, X, Check, Settings, Star, Copy, LogOut, ArrowDownCircle, ArrowUpCircle, ShieldCheck, Dices, Award, Trophy } from 'lucide-react';
+import { Pickaxe, ShoppingBag, Wallet, UserCircle2, Activity, Gem, X, Check, Settings, Star, Copy, LogOut, ArrowDownCircle, ArrowUpCircle, ShieldCheck, Dices } from 'lucide-react';
 import { Tab, PlayerState, TelegramUser } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ACHIEVEMENTS, calculateLevel, ADMIN_WALLET_ADDRESS } from '../../constants';
+import { ACHIEVEMENTS, calculateLevel } from '../../constants';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   playerState: PlayerState;
-  onWalletAction?: (type: 'connect' | 'disconnect' | 'add_ton', amount?: number) => void;
+  onWalletAction?: (type: 'connect' | 'disconnect' | 'add_ton' | 'add_stars', amount?: number) => void;
 }
 
-// Icon Mapping for Header Fallback
 const iconMap: Record<string, React.ReactNode> = {
-  'Pickaxe': <Pickaxe size={12} className="text-neuro-cyan" />,
+  'Pickaxe': <Pickaxe size={12} />,
   'Zap': <div className="text-neuro-cyan"><Settings size={12}/></div>, 
   'Crown': <div className="text-neuro-gold"><Gem size={12}/></div>,
-  'Award': <Award size={12} className="text-orange-400" />,
-  'Star': <Star size={12} className="text-neuro-cyan" />,
-  'Trophy': <Trophy size={12} className="text-neuro-gold" />,
-  'Gem': <Gem size={12} className="text-neuro-pink" />,
 };
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playerState, onWalletAction }) => {
@@ -34,16 +29,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
   
   // Calculate Level dynamically
   const currentLevel = calculateLevel(playerState.lifetimeHashes);
-
-  // --- HIGHEST BADGE LOGIC FOR HEADER ---
-  const highestClaimedIndex = ACHIEVEMENTS.reduce((maxIndex, ach, idx) => {
-      const record = playerState.achievements[ach.id];
-      if (record && record.claimed) {
-          return idx > maxIndex ? idx : maxIndex;
-      }
-      return maxIndex;
-  }, -1);
-  const highestBadge = highestClaimedIndex > -1 ? ACHIEVEMENTS[highestClaimedIndex] : null;
 
   useEffect(() => {
     // Initialize Telegram Web App
@@ -78,6 +63,14 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
     }
   }, [setLanguage]);
 
+  // Helper to check achievement status
+  const isUnlocked = (achId: string) => {
+    const ach = ACHIEVEMENTS.find(a => a.id === achId);
+    if (!ach) return false;
+    const val = ach.type === 'balance' ? playerState.balance : playerState.clickPower;
+    return val >= ach.threshold;
+  };
+
   const shortenAddress = (addr: string) => {
     return addr.slice(0, 4) + '...' + addr.slice(-4);
   };
@@ -88,14 +81,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
         onWalletAction('add_ton', amount);
         setTonDepositAmount(''); // Clear input
     }
-  };
-
-  const copyAdminAddress = () => {
-      navigator.clipboard.writeText(ADMIN_WALLET_ADDRESS);
-      if(window.Telegram?.WebApp?.HapticFeedback) {
-          window.Telegram.WebApp.HapticFeedback.selectionChanged();
-      }
-      alert("Admin Wallet Address Copied!");
   };
 
   return (
@@ -135,21 +120,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
                 </div>
                 
                 <div className="flex flex-col items-start mr-1">
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-[13px] font-bold text-white leading-none max-w-[90px] truncate mb-1 tracking-wide">
-                            {user?.first_name || 'Pilot'}
-                        </span>
-                        {/* HEADER BADGE */}
-                        {highestBadge && (
-                            <div className="w-4 h-4 rounded-full flex items-center justify-center overflow-hidden bg-white/10 border border-white/20">
-                                {highestBadge.imageUrl ? (
-                                    <img src={highestBadge.imageUrl} alt="Badge" className="w-full h-full object-contain p-[1px]" />
-                                ) : (
-                                    iconMap[highestBadge.icon]
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    <span className="text-[13px] font-bold text-white leading-none max-w-[90px] truncate mb-1 tracking-wide">
+                        {user?.first_name || 'Pilot'}
+                    </span>
                     <span className="text-[10px] font-mono font-bold text-neuro-cyan/90 flex items-center gap-1.5 bg-neuro-cyan/10 px-1.5 py-[1px] rounded-[4px]">
                         {t('common.lvl')} {currentLevel} 
                     </span>
@@ -171,26 +144,30 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
             </button>
         </div>
         
-        {/* RIGHT: WALLET BUTTON */}
+        {/* RIGHT: WALLET PILL (Updated with Balance) */}
         <button 
             onClick={() => setIsWalletOpen(true)}
-            className={`pointer-events-auto flex items-center gap-2 backdrop-blur-xl border rounded-full px-3 py-1.5 shadow-lg active:scale-95 transition-transform group ${playerState.walletAddress ? 'bg-[#0098EA]/20 border-[#0098EA]/50' : 'bg-[#0a0a0a]/80 border-white/10'}`}
+            className="pointer-events-auto flex items-center gap-2 bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/10 rounded-full px-2 py-1.5 shadow-lg active:scale-95 transition-transform group hover:border-neuro-cyan/30"
         >
-             {playerState.walletAddress ? (
-                 <>
-                    <div className="w-5 h-5 rounded-full bg-[#0098EA] flex items-center justify-center shadow-[0_0_8px_rgba(0,152,234,0.6)]">
-                        <Wallet size={12} className="text-white" />
-                    </div>
-                    <span className="text-[11px] font-mono font-bold text-white">
-                        {playerState.tonBalance > 0 ? playerState.tonBalance.toFixed(2) : '0.00'} TON
-                    </span>
-                 </>
-             ) : (
-                 <>
-                    <Wallet size={16} className="text-white" />
-                    <span className="text-[10px] font-bold text-white uppercase">{t('wallet.connect')}</span>
-                 </>
-             )}
+             {/* TON Balance */}
+             <div className="flex items-center gap-1.5 pl-1">
+                <div className="w-5 h-5 rounded-full bg-[#0098EA] flex items-center justify-center shadow-[0_0_8px_rgba(0,152,234,0.6)]">
+                    <Wallet size={12} className="text-white" />
+                </div>
+                <span className="text-[11px] font-mono font-bold text-white">
+                    {playerState.tonBalance > 0 ? playerState.tonBalance.toFixed(2) : '0.00'}
+                </span>
+             </div>
+
+             <div className="w-[1px] h-4 bg-white/10"></div>
+
+             {/* Stars Balance */}
+             <div className="flex items-center gap-1.5 pr-1">
+                <Star size={14} className="text-[#FFB800] fill-[#FFB800] drop-shadow-[0_0_6px_rgba(255,184,0,0.6)]" />
+                <span className="text-[11px] font-mono font-bold text-white">
+                    {playerState.starsBalance.toLocaleString()}
+                </span>
+             </div>
         </button>
 
       </header>
@@ -385,43 +362,53 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
                     </div>
                 )}
 
-                {/* TON Card - Full Width */}
-                <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-[#0098EA] blur-[40px] opacity-10 group-hover:opacity-20 transition-opacity"></div>
-                    <div className="w-10 h-10 rounded-full bg-[#0098EA]/10 flex items-center justify-center mb-2">
-                            <Wallet size={20} className="text-[#0098EA]" />
-                    </div>
-                    <div className="text-xs text-slate-400 font-bold uppercase mb-1">{t('wallet.ton')}</div>
-                    <div className="text-lg font-mono font-bold text-white mb-2">{playerState.tonBalance.toFixed(2)}</div>
-                    
-                    {/* DEPOSIT SECTION (SIMULATION) */}
-                    <div className="w-full flex flex-col gap-1 mb-2">
-                            <div className="text-[9px] text-slate-500 uppercase font-bold text-left w-full pl-1">Address:</div>
-                            <button 
-                            onClick={copyAdminAddress}
-                            className="w-full bg-black/40 border border-white/10 rounded-md text-[10px] font-mono text-center text-neuro-cyan py-1 flex items-center justify-center gap-1 hover:bg-white/5 truncate"
-                            >
-                                {shortenAddress(ADMIN_WALLET_ADDRESS)} <Copy size={10}/>
-                            </button>
-                            <input 
-                            type="number" 
-                            placeholder="Amount"
-                            value={tonDepositAmount}
-                            onChange={(e) => setTonDepositAmount(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-md text-xs font-mono text-center text-white py-1 outline-none focus:border-[#0098EA] mt-1"
-                            />
+                {/* Balances Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Stars Card */}
+                    <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center relative overflow-hidden group">
+                        <div className="w-10 h-10 rounded-full bg-[#FFB800]/10 flex items-center justify-center mb-2">
+                             <Star size={20} className="text-[#FFB800] fill-[#FFB800]" />
+                        </div>
+                        <div className="text-xs text-slate-400 font-bold uppercase mb-1">{t('wallet.stars')}</div>
+                        <div className="text-lg font-mono font-bold text-white mb-3">{playerState.starsBalance.toLocaleString()}</div>
+                        <button 
+                            onClick={() => onWalletAction && onWalletAction('add_stars')}
+                            className="w-full py-2 bg-[#FFB800]/20 text-[#FFB800] rounded-lg text-xs font-bold border border-[#FFB800]/30 hover:bg-[#FFB800]/30 transition-colors flex items-center justify-center gap-1"
+                        >
+                            <ArrowDownCircle size={14} /> +250
+                        </button>
                     </div>
 
-                    <button 
-                            onClick={handleDepositTon}
-                            className={`w-full py-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1 transition-colors
-                            ${parseFloat(tonDepositAmount) > 0 
-                                ? 'bg-[#0098EA]/20 text-[#0098EA] border-[#0098EA]/30 hover:bg-[#0098EA]/30' 
-                                : 'bg-white/5 text-slate-500 border-white/5 cursor-not-allowed'}
-                            `}
-                    >
-                        <ArrowDownCircle size={14} /> Check TX
-                    </button>
+                    {/* TON Card */}
+                    <div className="bg-[#1a1a1a] rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-[#0098EA] blur-[40px] opacity-10 group-hover:opacity-20 transition-opacity"></div>
+                        <div className="w-10 h-10 rounded-full bg-[#0098EA]/10 flex items-center justify-center mb-2">
+                             <Wallet size={20} className="text-[#0098EA]" />
+                        </div>
+                        <div className="text-xs text-slate-400 font-bold uppercase mb-1">{t('wallet.ton')}</div>
+                        <div className="text-lg font-mono font-bold text-white mb-2">{playerState.tonBalance.toFixed(2)}</div>
+                        
+                        <div className="w-full flex gap-1 mb-2">
+                             <input 
+                                type="number" 
+                                placeholder="0.0"
+                                value={tonDepositAmount}
+                                onChange={(e) => setTonDepositAmount(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-md text-xs font-mono text-center text-white py-1 outline-none focus:border-[#0098EA]"
+                             />
+                        </div>
+
+                        <button 
+                             onClick={handleDepositTon}
+                             className={`w-full py-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1 transition-colors
+                                ${parseFloat(tonDepositAmount) > 0 
+                                    ? 'bg-[#0098EA]/20 text-[#0098EA] border-[#0098EA]/30 hover:bg-[#0098EA]/30' 
+                                    : 'bg-white/5 text-slate-500 border-white/5 cursor-not-allowed'}
+                             `}
+                        >
+                            <ArrowDownCircle size={14} /> {t('wallet.deposit')}
+                        </button>
+                    </div>
                 </div>
 
             </div>

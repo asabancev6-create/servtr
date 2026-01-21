@@ -11,7 +11,7 @@ interface GamesProps {
   onRefreshGlobal: () => void;
 }
 
-type Currency = 'NRC' | 'TON';
+type Currency = 'NRC' | 'TON' | 'STARS';
 
 // ITEMS DEFINITION - Updated multipliers to match backend
 const CYBER_ITEMS = [
@@ -25,6 +25,7 @@ const CYBER_ITEMS = [
 const CURRENCY_CONFIG = {
     NRC: { color: 'text-neuro-cyan', bg: 'bg-neuro-cyan', border: 'border-neuro-cyan', shadow: 'shadow-[0_0_20px_rgba(0,240,255,0.4)]', betOptions: [10, 50, 100, 500] },
     TON: { color: 'text-[#0098EA]', bg: 'bg-[#0098EA]', border: 'border-[#0098EA]', shadow: 'shadow-[0_0_20px_rgba(0,152,234,0.4)]', betOptions: [0.1, 0.5, 1, 5] },
+    STARS: { color: 'text-[#FFB800]', bg: 'bg-[#FFB800]', border: 'border-[#FFB800]', shadow: 'shadow-[0_0_20px_rgba(255,184,0,0.4)]', betOptions: [50, 100, 500, 1000] }
 };
 
 // --- SUB-COMPONENT: CYBER SPIN (ROULETTE) ---
@@ -47,6 +48,7 @@ const CyberSpin: React.FC<GamesProps & { onBack: () => void, currency: Currency 
         // Balance Check
         if (currency === 'NRC' && bet > playerState.balance) { alert(t('games.insufficient_funds')); return; }
         if (currency === 'TON' && bet > playerState.tonBalance) { alert(t('games.insufficient_funds')); return; }
+        if (currency === 'STARS' && bet > playerState.starsBalance) { alert(t('games.insufficient_funds')); return; }
 
         setIsSpinning(true);
         setWinResult(null);
@@ -100,7 +102,7 @@ const CyberSpin: React.FC<GamesProps & { onBack: () => void, currency: Currency 
 
         } else {
             setIsSpinning(false);
-            alert((result as any).message || "Error");
+            alert(result.message || "Error");
         }
     };
 
@@ -233,7 +235,7 @@ const CyberSpin: React.FC<GamesProps & { onBack: () => void, currency: Currency 
     );
 };
 
-// --- SUB-COMPONENT: QUANTUM SLOTS ---
+// --- SUB-COMPONENT: QUANTUM SLOTS (Existing) ---
 const QuantumSlots: React.FC<GamesProps & { onBack: () => void, currency: Currency }> = ({ playerState, globalStats, onUpdate, onRefreshGlobal, onBack, currency }) => {
     const { t } = useLanguage();
     const config = CURRENCY_CONFIG[currency];
@@ -250,6 +252,7 @@ const QuantumSlots: React.FC<GamesProps & { onBack: () => void, currency: Curren
         // Balance Check
         if (currency === 'NRC' && bet > playerState.balance) { alert(t('games.insufficient_funds')); return; }
         if (currency === 'TON' && bet > playerState.tonBalance) { alert(t('games.insufficient_funds')); return; }
+        if (currency === 'STARS' && bet > playerState.starsBalance) { alert(t('games.insufficient_funds')); return; }
   
         setIsSpinning(true);
         setWinMessage(null);
@@ -293,7 +296,7 @@ const QuantumSlots: React.FC<GamesProps & { onBack: () => void, currency: Curren
             }
         } else {
             setIsSpinning(false);
-            alert((result as any).message || "Error");
+            alert(result.message || "Error");
         }
     };
 
@@ -398,7 +401,8 @@ const Games: React.FC<GamesProps> = (props) => {
   useEffect(() => {
      let pool = 0;
      if (currency === 'NRC') pool = props.globalStats.rewardPoolNrc;
-     else pool = props.globalStats.rewardPoolTon;
+     else if (currency === 'TON') pool = props.globalStats.rewardPoolTon;
+     else pool = props.globalStats.rewardPoolStars;
 
      // 10% of Pool
      setJackpotAmount(Math.floor(pool * 0.10));
@@ -438,24 +442,36 @@ const Games: React.FC<GamesProps> = (props) => {
 
         {/* CURRENCY SWITCHER */}
         <div className="flex bg-[#0a0a0a] rounded-xl p-1 border border-white/10 gap-1">
-            {(['NRC', 'TON'] as Currency[]).map((curr) => {
+            {(['NRC', 'TON', 'STARS'] as Currency[]).map((curr) => {
                 const isActive = currency === curr;
                 const cConf = CURRENCY_CONFIG[curr];
+                const isLocked = curr !== 'NRC'; // Only NRC is currently active
                 
                 return (
                     <button
                         key={curr}
-                        onClick={() => setCurrency(curr)}
+                        disabled={isLocked}
+                        onClick={() => !isLocked && setCurrency(curr)}
                         className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 relative overflow-hidden
                             ${isActive ? `${cConf.bg} text-black shadow-lg scale-[1.02]` : ''}
-                            ${!isActive ? 'text-slate-500 hover:text-white hover:bg-white/5' : ''}
+                            ${isLocked ? 'bg-white/5 opacity-50 cursor-not-allowed border border-white/5 text-slate-600' : 'text-slate-500 hover:text-white hover:bg-white/5'}
                         `}
                     >
                         {/* Icons */}
                         {curr === 'TON' && <Wallet size={12}/>}
+                        {curr === 'STARS' && <Star size={12} fill="currentColor"/>}
                         {curr === 'NRC' && <Zap size={12} fill="currentColor"/>}
                         
                         {curr}
+
+                        {/* Lock / Soon Badge */}
+                        {isLocked && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                                <span className="text-[9px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg transform rotate-[-5deg] border border-white/20">
+                                    <Lock size={8} /> SOON
+                                </span>
+                            </div>
+                        )}
                     </button>
                 )
             })}

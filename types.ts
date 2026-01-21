@@ -58,7 +58,6 @@ export interface Achievement {
   name: LocalizedText;
   description: LocalizedText;
   icon: string;
-  imageUrl?: string;
   threshold: number; // Value needed to unlock
   type: 'balance' | 'clickPower' | 'level'; // Added 'level' type
   reward: string; // e.g. "3 TON"
@@ -81,7 +80,8 @@ export interface AchievementProgress {
 
 export interface PlayerState {
   balance: number; // NRC
-  tonBalance: number; // TON Balance (Synced with wallet)
+  tonBalance: number; // New TON Balance
+  starsBalance: number; // New Stars Balance
   walletAddress: string | null; // Connected Wallet Address
   clickPower: number;
   autoMineRate: number; // Coins per second
@@ -148,7 +148,9 @@ export interface GlobalStats {
   // REWARD POOLS
   rewardPoolNrc: number;   // 10% of mined blocks + Sold Tokens
   rewardPoolTon: number;   // 10% of Shop Purchases + 90% of Game Losses
+  rewardPoolStars: number; // 90% of Game Losses (Stars are virtual here mostly)
   
+  marketPoolNrc: number; // DEPRECATED
   currentPrice: number; // Calculated Price
   priceHistory: PricePoint[]; // NEW: Historical data for chart
   

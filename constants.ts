@@ -3,17 +3,6 @@ import { Upgrade, CollectionItem, Achievement, Quest, PlayerState, ExchangeConfi
 export const MAX_SUPPLY = 13_000_000;
 export const GLOBAL_REFRESH_RATE = 2000; 
 
-// --- INFRASTRUCTURE CONFIG ---
-export const ADMIN_WALLET_ADDRESS = 'UQAx408EfLCH0JZWxffL1c5aMSSFpNcgXLW_ezucTOqOE0_V';
-export const APP_DOMAIN = 'chatgpt-helper.ru';
-
-// DYNAMIC URL LOGIC:
-// If running in browser, use current address (IP or Domain). 
-// This fixes the issue where the app can't reach the API if accessed via IP:3000
-export const APP_URL = (typeof window !== 'undefined' && window.location) 
-  ? window.location.origin 
-  : `https://${APP_DOMAIN}`;
-
 // Blockchain Parameters (NeuroCoin Spec)
 export const TARGET_BLOCK_TIME = 360; // 6 Minutes (360 seconds)
 export const EPOCH_LENGTH = 1300; // Difficulty recalculation every 1300 blocks
@@ -33,6 +22,7 @@ export const INITIAL_EXCHANGE_CONFIG: ExchangeConfig = {
 export const INITIAL_STATE: PlayerState = {
   balance: 0,
   tonBalance: 0,
+  starsBalance: 0,
   walletAddress: null,
   clickPower: 100, // Matches the base requirement: 100 hashes/sec (or per click for manual start)
   autoMineRate: 0,
@@ -58,6 +48,11 @@ export const INITIAL_STATE: PlayerState = {
 
 // --- UTILITIES ---
 export const calculateLevel = (lifetimeHashes: number): number => {
+    // Formula: Level = floor(log2(hashes / 100 + 1))
+    // Example: 0 hashes = lvl 0 -> fix to min 1
+    // 100 hashes = lvl 1
+    // 300 hashes = lvl 2
+    // 700 hashes = lvl 3
     const safeHashes = Math.max(0, lifetimeHashes);
     return Math.max(1, Math.floor(Math.log2(safeHashes / 100 + 1)));
 };
@@ -75,40 +70,17 @@ export const formatHashValue = (hashes: number): string => {
   if (hashes >= 1_000_000_000_000_000) return `${(hashes / 1_000_000_000_000_000).toFixed(2)} PH`;
   if (hashes >= 1_000_000_000_000) return `${(hashes / 1_000_000_000_000).toFixed(2)} TH`;
   if (hashes >= 1_000_000_000) return `${(hashes / 1_000_000_000).toFixed(2)} GH`;
-  if (hashes >= 1_000_000_000) return `${(hashes / 1_000_000).toFixed(2)} MH`;
+  if (hashes >= 1_000_000) return `${(hashes / 1_000_000).toFixed(2)} MH`;
   if (hashes >= 1_000) return `${(hashes / 1_000).toFixed(2)} kH`;
   return `${Math.floor(hashes)} H`;
 };
 
-// ACHIEVEMENTS with custom icons
-// Note: You must replace the imageUrls with the actual paths or URLs to your hosted images.
 export const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'neural_link',
-    name: { en: 'Neural Overload', ru: 'Нейро Перегрузка' },
-    description: { en: 'Reach 1,000 Click Power via upgrades.', ru: 'Достичь силы клика 1,000 через улучшения.' },
-    icon: 'Zap',
-    imageUrl: './assets/badges/neural_overload.png', // Icon 1
-    threshold: 1000,
-    type: 'clickPower',
-    reward: '5.0 TON'
-  },
-  {
-    id: 'cyber_miner',
-    name: { en: 'Cyber Miner', ru: 'Кибер Майнер' },
-    description: { en: 'Mine 5,000 NeuroCoins manually.', ru: 'Добыть 5,000 NeuroCoins вручную.' },
-    icon: 'Pickaxe',
-    imageUrl: './assets/badges/cyber_miner.png', // Icon 2
-    threshold: 5000,
-    type: 'balance',
-    reward: '0.5 TON'
-  },
   {
     id: 'lvl_100',
     name: { en: 'Level 100', ru: 'Уровень 100' },
     description: { en: 'Reach Player Level 100.', ru: 'Достигните 100-го уровня игрока.' },
-    icon: 'Award', 
-    imageUrl: './assets/badges/level_100.png', // Icon 3
+    icon: 'Award', // Changed to Award
     threshold: 100,
     type: 'level',
     reward: '1.0 TON'
@@ -117,8 +89,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'lvl_500',
     name: { en: 'Level 500', ru: 'Уровень 500' },
     description: { en: 'Reach Player Level 500.', ru: 'Достигните 500-го уровня игрока.' },
-    icon: 'Star', 
-    imageUrl: './assets/badges/level_500.png', // Icon 4
+    icon: 'Star', // Changed to Star
     threshold: 500,
     type: 'level',
     reward: '15.0 TON'
@@ -127,18 +98,34 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'lvl_1000',
     name: { en: 'Level 1000', ru: 'Уровень 1000' },
     description: { en: 'Reach Player Level 1000.', ru: 'Достигните 1000-го уровня игрока.' },
-    icon: 'Trophy', 
-    imageUrl: './assets/badges/level_1000.png', // Icon 5
+    icon: 'Trophy', // Changed to Trophy
     threshold: 1000,
     type: 'level',
     reward: '25.0 TON'
   },
   {
+    id: 'cyber_miner',
+    name: { en: 'Cyber Miner', ru: 'Кибер Майнер' },
+    description: { en: 'Mine 5,000 NeuroCoins manually.', ru: 'Добыть 5,000 NeuroCoins вручную.' },
+    icon: 'Pickaxe',
+    threshold: 5000,
+    type: 'balance',
+    reward: '0.5 TON'
+  },
+  {
+    id: 'neural_link',
+    name: { en: 'Neural Overload', ru: 'Нейро Перегрузка' },
+    description: { en: 'Reach 50 Click Power via upgrades.', ru: 'Достичь силы клика 50 через улучшения.' },
+    icon: 'Zap',
+    threshold: 50,
+    type: 'clickPower',
+    reward: '1.5 TON'
+  },
+  {
     id: 'quantum_whale',
     name: { en: 'Quantum Whale', ru: 'Квантовый Кит' },
     description: { en: 'Accumulate 100,000 NeuroCoins balance.', ru: 'Накопить баланс 100,000 NeuroCoins.' },
-    icon: 'Gem', 
-    imageUrl: './assets/badges/quantum_whale.png', // Icon 6
+    icon: 'Gem', // Changed to Gem
     threshold: 100000,
     type: 'balance',
     reward: '3.0 TON'
@@ -270,7 +257,7 @@ export const UPGRADES: Upgrade[] = [
   {
     id: 'miner_ultra',
     name: { en: 'ASIC Miner', ru: 'ASIC Майнер' },
-    description: { en: 'Специализированное оборудование.', ru: 'Специализированное оборудование.' },
+    description: { en: 'Specialized mining hardware.', ru: 'Специализированное оборудование.' },
     costTon: 9,
     costNrc: 450, 
     scaleTon: 0.06,

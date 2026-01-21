@@ -57,6 +57,7 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
   const levelProgressPercent = hashesNeededForNext > 0 ? Math.min(100, Math.max(0, (hashesProgressInLevel / hashesNeededForNext) * 100)) : 100;
 
   // --- ACHIEVEMENT HIGHEST BADGE LOGIC ---
+  // Find highest index CLAIMED achievement
   const highestClaimedIndex = ACHIEVEMENTS.reduce((maxIndex, ach, idx) => {
       const record = playerState.achievements[ach.id];
       if (record && record.claimed) {
@@ -228,6 +229,8 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
            </div>
        </div>
 
+       {/* EXCHANGE BLOCK (Unchanged Logic - Removed for brevity, same as previous) */}
+       
        {/* Trophies List */}
        <div className="glass-card rounded-xl p-5 border border-neuro-violet/20">
           <h3 className="font-bold text-white mb-5 text-base flex items-center gap-2 uppercase tracking-wider pl-1">
