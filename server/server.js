@@ -6,8 +6,9 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000; // Running on port 3000
+const PORT = 3000; // Application Port
 
+// Allow all CORS to prevent issues with Telegram Webview
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -115,9 +116,13 @@ const calculateOffline = (user, now) => {
     return estimatedReward;
 };
 
-// --- SERVE STATIC FRONTEND (Compiled React App) ---
-// This assumes the React build output is in the 'dist' folder at the root
+// --- SERVE STATIC FRONTEND ---
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// --- HEALTH CHECK ---
+app.get('/health', (req, res) => {
+    res.status(200).send('NeuroCoin Server: OK');
+});
 
 // --- API ENDPOINTS ---
 
@@ -235,12 +240,12 @@ app.post('/api/purchase', (req, res) => {
     res.json({ success: true, balance: user.balance, tonBalance: user.tonBalance });
 });
 
-// CATCH-ALL ROUTE (For React Router)
-// If request doesn't match API, send index.html
+// CATCH-ALL ROUTE
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`NeuroCoin Backend running on port ${PORT}`);
+    console.log(`NeuroCoin Server running on port ${PORT}`);
+    console.log(`Ready for Reverse Proxy (Nginx) from http://chatgpt-helper.ru`);
 });
