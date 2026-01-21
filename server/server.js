@@ -8,6 +8,9 @@ const path = require('path');
 const app = express();
 const PORT = 3000; // Application Port
 
+// Enable proxy trust to get correct IPs from Nginx (important for rate limiting or logging)
+app.enable('trust proxy');
+
 // Allow all CORS to prevent issues with Telegram Webview
 app.use(cors());
 app.use(bodyParser.json());
@@ -247,5 +250,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`NeuroCoin Server running on port ${PORT}`);
-    console.log(`Ready for Reverse Proxy (Nginx) from http://chatgpt-helper.ru`);
+    console.log(`Ready for Reverse Proxy (Nginx) via HTTPS`);
 });
