@@ -1,3 +1,4 @@
+
 import { Upgrade, CollectionItem, Achievement, Quest, PlayerState, ExchangeConfig } from './types';
 
 export const MAX_SUPPLY = 13_000_000;
@@ -32,6 +33,8 @@ export const INITIAL_STATE: PlayerState = {
   lifetimeHashes: 0, 
   premiumUntil: 0,
   
+  electricityDebt: 0, // NEW: Accumulated electricity cost
+
   lastDailyRewardClaim: 0,
   dailyStreak: 0,
   completedQuestIds: [],
@@ -80,28 +83,28 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'lvl_100',
     name: { en: 'Level 100', ru: 'Уровень 100' },
     description: { en: 'Reach Player Level 100.', ru: 'Достигните 100-го уровня игрока.' },
-    icon: 'Award', // Changed to Award
+    icon: 'Award',
     threshold: 100,
     type: 'level',
-    reward: '1.0 TON'
+    reward: '0.1 TON'
+  },
+  {
+    id: 'neural_link',
+    name: { en: 'Neural Overload', ru: 'Нейро Перегрузка' },
+    description: { en: 'Reach 500 Click Power via upgrades.', ru: 'Достичь силы клика 500 через улучшения.' },
+    icon: 'Zap',
+    threshold: 500,
+    type: 'clickPower',
+    reward: '0.5 TON'
   },
   {
     id: 'lvl_500',
     name: { en: 'Level 500', ru: 'Уровень 500' },
     description: { en: 'Reach Player Level 500.', ru: 'Достигните 500-го уровня игрока.' },
-    icon: 'Star', // Changed to Star
+    icon: 'Star',
     threshold: 500,
     type: 'level',
-    reward: '15.0 TON'
-  },
-  {
-    id: 'lvl_1000',
-    name: { en: 'Level 1000', ru: 'Уровень 1000' },
-    description: { en: 'Reach Player Level 1000.', ru: 'Достигните 1000-го уровня игрока.' },
-    icon: 'Trophy', // Changed to Trophy
-    threshold: 1000,
-    type: 'level',
-    reward: '25.0 TON'
+    reward: '0.8 TON'
   },
   {
     id: 'cyber_miner',
@@ -110,25 +113,25 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: 'Pickaxe',
     threshold: 5000,
     type: 'balance',
-    reward: '0.5 TON'
+    reward: '1.0 TON'
   },
   {
-    id: 'neural_link',
-    name: { en: 'Neural Overload', ru: 'Нейро Перегрузка' },
-    description: { en: 'Reach 50 Click Power via upgrades.', ru: 'Достичь силы клика 50 через улучшения.' },
-    icon: 'Zap',
-    threshold: 50,
-    type: 'clickPower',
+    id: 'lvl_1000',
+    name: { en: 'Level 1000', ru: 'Уровень 1000' },
+    description: { en: 'Reach Player Level 1000.', ru: 'Достигните 1000-го уровня игрока.' },
+    icon: 'Trophy',
+    threshold: 1000,
+    type: 'level',
     reward: '1.5 TON'
   },
   {
     id: 'quantum_whale',
     name: { en: 'Quantum Whale', ru: 'Квантовый Кит' },
     description: { en: 'Accumulate 100,000 NeuroCoins balance.', ru: 'Накопить баланс 100,000 NeuroCoins.' },
-    icon: 'Gem', // Changed to Gem
+    icon: 'Gem', 
     threshold: 100000,
     type: 'balance',
-    reward: '3.0 TON'
+    reward: '5.0 TON'
   }
 ];
 
@@ -468,6 +471,14 @@ export const COLLECTIONS: CollectionItem[] = [
     rarity: 'Quantum',
     description: { en: 'The brain of the machine.', ru: 'Мозг машины.' },
     icon: 'Brain',
+    unlocked: false,
+  },
+  {
+    id: 'quantum_vortex',
+    name: { en: 'Quantum Vortex', ru: 'Квантовый Вихрь' },
+    rarity: 'Quantum',
+    description: { en: 'A swirling vortex of pure energy from the future.', ru: 'Вихрь чистой энергии из будущего, застывший во времени.' },
+    icon: 'Atom',
     unlocked: false,
   },
 ];

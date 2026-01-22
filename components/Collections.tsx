@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { COLLECTIONS } from '../constants';
-import { Box, Key, Brain, Cpu, Lock, Gem, CheckCircle2, Clipboard, Share2, Users, Coins, Gift, Calendar, ArrowRight, AlertTriangle, Clock } from 'lucide-react';
+import { Box, Key, Brain, Cpu, Lock, Gem, CheckCircle2, Clipboard, Share2, Users, Coins, Gift, Calendar, ArrowRight, AlertTriangle, Clock, Atom } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { GameService } from '../services/mockBackend';
 import { PlayerState, Quest, GlobalStats } from '../types';
@@ -10,6 +11,7 @@ const iconMap: Record<string, React.ReactNode> = {
   'Key': <Key size={24} />,
   'Brain': <Brain size={24} />,
   'Cpu': <Cpu size={24} />,
+  'Atom': <Atom size={24} />,
 };
 
 const rarityStyles: Record<string, string> = {

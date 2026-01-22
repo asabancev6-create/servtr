@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { PlayerState, GlobalStats } from '../types';
 import { Zap, Activity, Cpu, Box, Check, BrainCircuit } from 'lucide-react';
@@ -123,7 +124,7 @@ const Miner: React.FC<MinerProps> = ({ playerState, globalStats, onMine }) => {
       </div>
 
       {/* 3. 3D QUANTUM SPHERE MINER */}
-      <div className="flex-1 flex flex-col justify-center items-center w-full relative z-10 perspective-1000 pb-60">
+      <div className="flex-1 flex flex-col justify-center items-center w-full relative z-10 perspective-1000 pb-60 pt-12">
         
         <div 
             className="relative w-64 h-64 cursor-pointer touch-none select-none group preserve-3d animate-float z-10"

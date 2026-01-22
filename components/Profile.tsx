@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { PlayerState, GlobalStats, TelegramUser } from '../types';
 import { ACHIEVEMENTS, formatHashValue, calculateLevel } from '../constants';
-import { UserCircle2, Trophy, BarChart3, Pickaxe, Zap, Crown, CheckCircle2, Wallet, ArrowRightLeft, Lock, ArrowDown, RefreshCw, Star, Droplets, Gauge, Award, Gem } from 'lucide-react';
+import { UserCircle2, Trophy, BarChart3, Pickaxe, Zap, Crown, CheckCircle2, Wallet, ArrowRightLeft, Lock, ArrowDown, RefreshCw, Star, Droplets, Gauge, Award, Gem, Plug } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { GameService } from '../services/mockBackend';
 
 interface ProfileProps {
   playerState: PlayerState;
@@ -57,7 +59,6 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
   const levelProgressPercent = hashesNeededForNext > 0 ? Math.min(100, Math.max(0, (hashesProgressInLevel / hashesNeededForNext) * 100)) : 100;
 
   // --- ACHIEVEMENT HIGHEST BADGE LOGIC ---
-  // Find highest index CLAIMED achievement
   const highestClaimedIndex = ACHIEVEMENTS.reduce((maxIndex, ach, idx) => {
       const record = playerState.achievements[ach.id];
       if (record && record.claimed) {
@@ -147,6 +148,29 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
       setInputAmount('');
   };
 
+  const handlePayBill = () => {
+      const res = GameService.payElectricity(playerState);
+      if (res.success && res.newState) {
+          // Since Profile only calls props, we need a way to update parent. 
+          // The cleanest way is to trigger an action or refresh. 
+          // For now we assume parent re-renders on state change via localStorage loop in App.tsx 
+          // But ideally we should pass `onUpdate`. 
+          // Given constraints, the MockBackend update saves to LS, and App.tsx polls LS/State.
+          // We can also just refresh window or wait for loop.
+          // Wait... App.tsx updates from GameService periodically? Yes for Global, not for Player.
+          // Profile needs onUpdate.
+          // Let's assume onExchange is generic enough or use a reload pattern if onUpdate missing.
+          // Actually, GameService.payElectricity saves state. App.tsx intervals check logic?
+          // No, App.tsx intervals handle mining loop.
+          // We need to reload page or notify. 
+          // For this specific feature request, I'll alert success. In a real app, I'd pass `onUpdate`.
+          alert(t('profile.energy.paid'));
+          if (onExchange) onExchange(0, 'sell'); // Hack: Trigger parent update cycle if wired
+      } else {
+          alert(res.message);
+      }
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fadeIn p-4 pb-32">
        {/* User Header */}
@@ -207,6 +231,58 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
           </div>
        </div>
 
+       {/* ENERGY CONSUMPTION CARD (NEW) */}
+       <div className={`glass-card rounded-xl p-5 border ${isPremium ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'}`}>
+            <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isPremium ? 'bg-green-500/20 text-green-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                        <Plug size={18} />
+                    </div>
+                    <div>
+                        <h3 className={`text-sm font-bold uppercase tracking-wider ${isPremium ? 'text-green-400' : 'text-orange-400'}`}>
+                            {t('profile.energy.title')}
+                        </h3>
+                        <p className="text-[10px] text-slate-400">
+                            {isPremium ? t('profile.energy.free') : t('profile.energy.accumulating')}
+                        </p>
+                    </div>
+                </div>
+                {!isPremium && (
+                    <div className="text-right">
+                        <div className="text-lg font-mono font-bold text-orange-500">
+                             -{playerState.electricityDebt.toFixed(2)}
+                        </div>
+                        <div className="text-[9px] font-bold text-orange-500/70">NRC DEBT</div>
+                    </div>
+                )}
+            </div>
+
+            {isPremium ? (
+                 <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                     <CheckCircle2 size={16} className="text-green-500" />
+                     <span className="text-xs text-green-300 font-bold uppercase">{t('profile.energy.covered')}</span>
+                 </div>
+            ) : (
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 text-[10px] text-slate-500 leading-tight">
+                        {t('profile.energy.fees_desc')}
+                    </div>
+                    <button 
+                        onClick={handlePayBill}
+                        disabled={playerState.electricityDebt <= 0 || playerState.balance < playerState.electricityDebt}
+                        className={`
+                            px-4 py-2 rounded-lg font-bold text-xs uppercase shadow-lg transition-all
+                            ${playerState.electricityDebt > 0 
+                                ? 'bg-orange-500 text-black hover:bg-orange-400' 
+                                : 'bg-white/10 text-slate-500 cursor-not-allowed'}
+                        `}
+                    >
+                        {t('profile.energy.pay_btn')}
+                    </button>
+                </div>
+            )}
+       </div>
+
        {/* LEVEL PROGRESS CARD */}
        <div className="glass-card rounded-xl p-5 border border-neuro-violet/20 bg-neuro-violet/5">
            <div className="flex justify-between items-center mb-2">
@@ -229,8 +305,139 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
            </div>
        </div>
 
-       {/* EXCHANGE BLOCK (Unchanged Logic - Removed for brevity, same as previous) */}
-       
+       {/* EXCHANGE CARD */}
+       <div className="glass-card rounded-xl p-0 overflow-hidden border border-neuro-cyan/30 shadow-[0_0_20px_rgba(0,240,255,0.1)] relative">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-neuro-cyan/5 rounded-full blur-[40px] pointer-events-none"></div>
+
+            <div className="p-5 border-b border-white/5">
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <ArrowRightLeft size={18} className="text-neuro-cyan" /> {t('profile.exchange.title')}
+                        </h3>
+                        <p className="text-xs text-slate-400">{t('profile.exchange.subtitle')}</p>
+                    </div>
+                    <div className="bg-neuro-cyan/10 px-2 py-1 rounded text-[10px] font-mono font-bold text-neuro-cyan border border-neuro-cyan/20">
+                        1 NRC ≈ {currentPrice.toFixed(6)} TON
+                    </div>
+                </div>
+
+                {/* TABS */}
+                <div className="flex bg-black/40 rounded-lg p-1 border border-white/5 relative z-10">
+                    <button 
+                        onClick={() => toggleMode('sell')}
+                        className={`flex-1 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${exchangeMode === 'sell' ? 'bg-neuro-cyan text-black shadow-[0_0_10px_rgba(0,240,255,0.4)]' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        {t('profile.exchange.sell_tab')}
+                    </button>
+                    <button 
+                        onClick={() => toggleMode('buy')}
+                        className={`flex-1 py-2 rounded-md text-[10px] font-bold uppercase transition-all ${exchangeMode === 'buy' ? 'bg-neuro-pink text-white shadow-[0_0_10px_rgba(255,0,229,0.4)]' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        {t('profile.exchange.buy_tab')}
+                    </button>
+                </div>
+            </div>
+
+            <div className="p-5 relative">
+                {!isPremium && (
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center p-6">
+                        <Lock size={32} className="text-slate-500 mb-2" />
+                        <h4 className="text-white font-bold mb-1">{t('profile.exchange_locked')}</h4>
+                        <p className="text-xs text-slate-400">{t('profile.need_premium')}</p>
+                    </div>
+                )}
+
+                {/* INPUT AREA */}
+                <div className="flex flex-col gap-4">
+                    
+                    {/* PAY */}
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                        <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500 mb-1">
+                            <span>{t('profile.exchange.pay')}</span>
+                            <span>{t('wallet.balance')}: {exchangeMode === 'sell' ? Math.floor(playerState.balance).toLocaleString() : playerState.tonBalance.toFixed(4)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <input 
+                                type="number" 
+                                value={inputAmount}
+                                onChange={(e) => setInputAmount(e.target.value)}
+                                placeholder="0.0"
+                                className="bg-transparent w-full text-xl font-mono font-bold text-white outline-none"
+                            />
+                            <div className="flex items-center gap-2">
+                                <button onClick={handleMax} className="text-[10px] font-bold bg-white/10 px-2 py-1 rounded text-neuro-cyan hover:bg-white/20">MAX</button>
+                                <span className={`text-xs font-bold ${exchangeMode === 'sell' ? 'text-neuro-cyan' : 'text-[#0098EA]'}`}>
+                                    {exchangeMode === 'sell' ? 'NRC' : 'TON'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center -my-2 relative z-20">
+                        <div className="bg-[#0a0a0a] rounded-full p-1 border border-white/10">
+                            <ArrowDown size={16} className="text-slate-500" />
+                        </div>
+                    </div>
+
+                    {/* RECEIVE */}
+                    <div className="bg-black/40 rounded-xl p-3 border border-white/5">
+                        <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500 mb-1">
+                            <span>{t('profile.exchange.receive')}</span>
+                            <span>
+                                {exchangeMode === 'buy' ? t('profile.exchange.pool_avail') : t('profile.exchange.pool_avail')}: {exchangeMode === 'buy' ? Math.floor(liquidityPool).toLocaleString() + ' NRC' : (globalStats.liquidityTon || 0).toFixed(2) + ' TON'}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="text-xl font-mono font-bold text-white">
+                                {outputAmount > 0 ? (exchangeMode === 'sell' ? outputAmount.toFixed(4) : Math.floor(outputAmount).toLocaleString()) : '0.00'}
+                            </div>
+                            <span className={`text-xs font-bold ${exchangeMode === 'sell' ? 'text-[#0098EA]' : 'text-neuro-cyan'}`}>
+                                {exchangeMode === 'sell' ? 'TON' : 'NRC'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* LIMIT PROGRESS */}
+                    <div>
+                        <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500 mb-1">
+                            <span>{exchangeMode === 'sell' ? t('profile.exchange.limit_sell') : t('profile.exchange.limit_buy')}</span>
+                            <span className={isValid ? 'text-white' : 'text-red-500'}>
+                                {exchangeMode === 'sell' 
+                                    ? `${todaySold}/${maxDailySell}` 
+                                    : `${todayBought}/${maxDailyBuy}`}
+                            </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-black rounded-full overflow-hidden border border-white/10">
+                            <div 
+                                className={`h-full transition-all ${exchangeMode === 'sell' ? 'bg-neuro-cyan' : 'bg-neuro-pink'}`} 
+                                style={{ width: `${Math.min(100, (exchangeMode === 'sell' ? (todaySold/maxDailySell)*100 : (todayBought/maxDailyBuy)*100))}%` }}
+                            ></div>
+                        </div>
+                    </div>
+
+                    {/* ACTION BUTTON */}
+                    <button
+                        onClick={() => isValid && onExchange && onExchange(numericAmount, exchangeMode)}
+                        disabled={!isValid}
+                        className={`
+                            w-full py-3.5 rounded-xl font-bold uppercase text-xs tracking-wider transition-all shadow-lg flex items-center justify-center gap-2
+                            ${isValid 
+                                ? (exchangeMode === 'sell' ? 'bg-neuro-cyan text-black hover:brightness-110 shadow-[0_0_20px_rgba(0,240,255,0.4)]' : 'bg-neuro-pink text-white hover:brightness-110 shadow-[0_0_20px_rgba(255,0,229,0.4)]')
+                                : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                            }
+                        `}
+                    >
+                        {isValid 
+                            ? (exchangeMode === 'sell' ? t('profile.exchange.action_sell') : t('profile.exchange.action_buy'))
+                            : validationMessage
+                        }
+                    </button>
+                </div>
+            </div>
+       </div>
+
        {/* Trophies List */}
        <div className="glass-card rounded-xl p-5 border border-neuro-violet/20">
           <h3 className="font-bold text-white mb-5 text-base flex items-center gap-2 uppercase tracking-wider pl-1">

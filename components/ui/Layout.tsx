@@ -1,3 +1,5 @@
+
+// ... (imports remain the same)
 import React, { useState, useEffect } from 'react';
 import { Pickaxe, ShoppingBag, Wallet, UserCircle2, Activity, Gem, X, Check, Settings, Star, Copy, LogOut, ArrowDownCircle, ArrowUpCircle, ShieldCheck, Dices } from 'lucide-react';
 import { Tab, PlayerState, TelegramUser } from '../../types';
@@ -17,6 +19,9 @@ const iconMap: Record<string, React.ReactNode> = {
   'Zap': <div className="text-neuro-cyan"><Settings size={12}/></div>, 
   'Crown': <div className="text-neuro-gold"><Gem size={12}/></div>,
 };
+
+// ADMIN IDS CONFIGURATION
+const ADMIN_IDS = [7010848744, 1];
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playerState, onWalletAction }) => {
   const { t, language, setLanguage } = useLanguage();
@@ -53,9 +58,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
           setLanguage('ru');
         }
       } else {
-        // Fallback for development in browser
+        // Fallback for development in browser - Set ID to 1 for testing admin access in dev mode if needed
         setUser({
-           id: 12345678,
+           id: 1, 
            first_name: "Pilot",
            username: "crypto_miner",
         });
@@ -83,6 +88,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
     }
   };
 
+  // Check Admin Permissions
+  const isAdmin = user && ADMIN_IDS.includes(user.id);
+
   return (
     // Use h-[100dvh] for dynamic viewport height on mobile browsers and TG WebApp
     <div className="flex flex-col h-[100dvh] w-full bg-neuro-bg text-white relative font-sans overflow-hidden selection:bg-neuro-cyan/30">
@@ -95,7 +103,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
       </div>
 
       {/* FLOATING HUD HEADER */}
-      <header className="absolute top-0 left-0 w-full z-50 px-3 pt-4 pb-2 flex justify-between items-center pointer-events-none">
+      {/* ADDED: pt-[calc(env(safe-area-inset-top)+12px)] to handle notch/status bar */}
+      <header className="absolute top-0 left-0 w-full z-50 px-3 pt-[calc(env(safe-area-inset-top)+12px)] pb-2 flex justify-between items-center pointer-events-none">
         
         {/* LEFT: EXPANDED COMMAND HUB (Profile + Settings) */}
         <div className="pointer-events-auto flex items-center bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] gap-3 pr-2 transition-transform active:scale-[0.98]">
@@ -172,8 +181,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
 
       </header>
 
-      {/* Main Content Area - Padding top adjusted for floating header */}
-      <main className="flex-1 overflow-y-auto z-10 custom-scrollbar overscroll-contain pt-24">
+      {/* Main Content Area - Padding top adjusted for floating header and Safe Area */}
+      {/* ADDED: pt-[calc(env(safe-area-inset-top)+88px)] ensures content starts below the header */}
+      <main className="flex-1 overflow-y-auto z-10 custom-scrollbar overscroll-contain pt-[calc(env(safe-area-inset-top)+88px)]">
         {children}
       </main>
 
@@ -294,13 +304,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
                 {language === 'en' && <Check size={20} className="text-neuro-cyan" />}
               </button>
 
-              {/* ADMIN ACCESS BUTTON */}
-              <button 
-                onClick={() => { onTabChange(Tab.ADMIN); setIsSettingsOpen(false); }}
-                className="w-full mt-4 flex items-center justify-center gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500/20 font-bold text-xs uppercase tracking-widest transition-all"
-              >
-                 <ShieldCheck size={14} /> {t('profile.admin_access')}
-              </button>
+              {/* ADMIN ACCESS BUTTON - RESTRICTED */}
+              {isAdmin && (
+                  <button 
+                    onClick={() => { onTabChange(Tab.ADMIN); setIsSettingsOpen(false); }}
+                    className="w-full mt-4 flex items-center justify-center gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500/20 font-bold text-xs uppercase tracking-widest transition-all"
+                  >
+                     <ShieldCheck size={14} /> {t('profile.admin_access')}
+                  </button>
+              )}
 
             </div>
           </div>

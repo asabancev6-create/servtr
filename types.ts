@@ -93,6 +93,9 @@ export interface PlayerState {
   // Premium Status
   premiumUntil: number; // Timestamp, 0 if no premium
 
+  // Economy & Bills
+  electricityDebt: number; // Accumulated electricity cost
+
   // Quest & Social
   lastDailyRewardClaim: number; // Timestamp
   dailyStreak: number; 
@@ -126,6 +129,15 @@ export interface PricePoint {
   price: number;
 }
 
+export interface LeaderboardEntry {
+  id: number | string;
+  name: string;
+  balance: number;
+  isUser: boolean;
+  avatar?: string;
+  rank?: number;
+}
+
 export interface GlobalStats {
   totalUsers: number;
   totalMined: number;
@@ -154,6 +166,8 @@ export interface GlobalStats {
   currentPrice: number; // Calculated Price
   priceHistory: PricePoint[]; // NEW: Historical data for chart
   
+  leaderboard: LeaderboardEntry[]; // GLOBAL LEADERBOARD
+
   // Admin Config
   rewardConfig: RewardConfig;
   exchangeConfig: ExchangeConfig; // NEW: Admin controlled limits

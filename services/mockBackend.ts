@@ -1,4 +1,5 @@
-import { PlayerState, GlobalStats, RewardConfig, Quest, LocalizedText, ExchangeConfig, PricePoint } from '../types';
+
+import { PlayerState, GlobalStats, RewardConfig, Quest, LocalizedText, ExchangeConfig, PricePoint, LeaderboardEntry } from '../types';
 import { MAX_SUPPLY, INITIAL_STATE, UPGRADES, DAILY_REWARD_BASE, INITIAL_QUESTS, INITIAL_EXCHANGE_CONFIG, INITIAL_BLOCK_REWARD, HALVING_INTERVAL, EPOCH_LENGTH, TARGET_BLOCK_TIME, INITIAL_DIFFICULTY, ACHIEVEMENTS, calculateLevel } from '../constants';
 
 // VERSION 17 - TOTAL WIPE (GENESIS ZERO)
@@ -6,6 +7,24 @@ const STORAGE_KEY = 'neurocoin_genesis_v17_player';
 const GLOBAL_STORAGE_KEY = 'neurocoin_global_v17_ledger';
 
 interface StoredGlobalState extends GlobalStats {}
+
+// Helper to generate backfill history - FLAT LINE FOR GENESIS
+const generateBackfillHistory = (): PricePoint[] => {
+    const history: PricePoint[] = [];
+    const now = Date.now();
+    const startPrice = 0.000001;
+    
+    // Generate data for last 24 hours only, flat line
+    const points = 100;
+    const interval = (24 * 60 * 60 * 1000) / points;
+
+    for (let i = points; i >= 0; i--) {
+        const time = now - (i * interval);
+        // Absolute silence, flat line
+        history.push({ time, price: startPrice });
+    }
+    return history;
+};
 
 // GLOBAL LEDGER INITIALIZATION - GENESIS STATE
 const INITIAL_GLOBAL: StoredGlobalState = {
@@ -34,6 +53,8 @@ const INITIAL_GLOBAL: StoredGlobalState = {
   currentPrice: 0.000001, // STARTING AT ALMOST ZERO
   priceHistory: [], // Will be filled in loadGlobalState
   
+  leaderboard: [], // Only contains real users (Mock: just current user)
+
   rewardConfig: {
       poolPercent: 10,       // 10% Protocol Fee
       closerPercent: 70,     // 70% Winner (You)
@@ -42,24 +63,6 @@ const INITIAL_GLOBAL: StoredGlobalState = {
   exchangeConfig: INITIAL_EXCHANGE_CONFIG, 
   quests: INITIAL_QUESTS,
   baseDailyReward: DAILY_REWARD_BASE
-};
-
-// Helper to generate backfill history - FLAT LINE FOR GENESIS
-const generateBackfillHistory = (): PricePoint[] => {
-    const history: PricePoint[] = [];
-    const now = Date.now();
-    const startPrice = 0.000001;
-    
-    // Generate data for last 24 hours only, flat line
-    const points = 100;
-    const interval = (24 * 60 * 60 * 1000) / points;
-
-    for (let i = points; i >= 0; i--) {
-        const time = now - (i * interval);
-        // Absolute silence, flat line
-        history.push({ time, price: startPrice });
-    }
-    return history;
 };
 
 // Simulating a backend service
@@ -83,6 +86,7 @@ export class GameService {
 
         if (parsed.lastSaveTime === undefined) parsed.lastSaveTime = Date.now();
         if (parsed.premiumUntil === undefined) parsed.premiumUntil = 0;
+        if (parsed.electricityDebt === undefined) parsed.electricityDebt = 0;
         
         // Ensure achievements object exists
         if (!parsed.achievements) parsed.achievements = {};
@@ -211,6 +215,9 @@ export class GameService {
           if (!parsed.priceHistory || parsed.priceHistory.length === 0) {
               parsed.priceHistory = generateBackfillHistory();
           }
+          
+          // Reset leaderboard to empty if simulating strictly no fake users
+          parsed.leaderboard = [];
 
           return { ...INITIAL_GLOBAL, ...parsed };
       }
@@ -252,6 +259,7 @@ export class GameService {
       let newPlayerState = { ...playerState };
       let totalReward = 0;
       let anyBlockClosed = false;
+      const isPremium = newPlayerState.premiumUntil > Date.now();
       
       if (newPlayerState.balance >= MAX_SUPPLY) return { newPlayerState, blockClosed: false, reward: 0 };
 
@@ -280,6 +288,11 @@ export class GameService {
           newPlayerState.balance += shareReward;
           newPlayerState.lifetimeHashes += accepted;
           totalReward += shareReward;
+
+          // ELECTRICITY FEE: 5% of distribution if NOT premium
+          if (!isPremium) {
+              newPlayerState.electricityDebt += (shareReward * 0.05);
+          }
           
           global.currentBlockHash += accepted;
           hashesLeft -= accepted;
@@ -294,6 +307,11 @@ export class GameService {
               const closerReward = blockReward * (closerPercent / 100);
               newPlayerState.balance += closerReward;
               totalReward += closerReward;
+
+              // ELECTRICITY FEE: Fixed 1 NRC for mining a block if NOT premium
+              if (!isPremium) {
+                  newPlayerState.electricityDebt += 1.0;
+              }
               
               // Protocol Fee
               global.rewardPoolNrc += blockReward * (poolPercent / 100);
@@ -337,7 +355,96 @@ export class GameService {
       return { newPlayerState, blockClosed: anyBlockClosed, reward: totalReward };
   }
 
-  // --- OTHER ACTIONS ---
+  // --- ELECTRICITY PAYMENT ---
+  static payElectricity(state: PlayerState): { success: boolean, newState?: PlayerState, message?: string } {
+      if (state.electricityDebt <= 0) return { success: false, message: 'No Debt' };
+      if (state.balance < state.electricityDebt) return { success: false, message: 'Insufficient NRC' };
+      
+      const global = this.loadGlobalState();
+      const newState = { ...state };
+      
+      const debt = newState.electricityDebt;
+      
+      // Deduct from User
+      newState.balance -= debt;
+      newState.electricityDebt = 0;
+      
+      // Add to Global Reward Pool
+      global.rewardPoolNrc += debt;
+      
+      this.saveState(newState);
+      this.saveGlobalState(global);
+      
+      return { success: true, newState };
+  }
+
+  // --- GAME LOGIC (30% HOUSE EDGE IMPLEMENTATION) ---
+
+  static startCrashGame(state: PlayerState, betAmount: number, currency: 'NRC' | 'TON' | 'STARS' = 'NRC'): { success: boolean, newState?: PlayerState, crashPoint?: number, message?: string } {
+      if (currency === 'NRC' && state.balance < betAmount) return { success: false, message: 'Insufficient NRC' };
+      if (currency === 'TON' && state.tonBalance < betAmount) return { success: false, message: 'Insufficient TON' };
+      if (currency === 'STARS' && state.starsBalance < betAmount) return { success: false, message: 'Insufficient Stars' };
+      if (betAmount <= 0) return { success: false, message: 'Invalid Bet' };
+
+      const globalState = this.loadGlobalState();
+      const newState = { ...state };
+
+      // Deduct Bet immediately
+      if (currency === 'NRC') {
+          newState.balance -= betAmount;
+          globalState.rewardPoolNrc += betAmount;
+      } else if (currency === 'TON') {
+          newState.tonBalance -= betAmount;
+          globalState.rewardPoolTon += betAmount;
+      } else {
+          newState.starsBalance -= betAmount;
+          globalState.rewardPoolStars += betAmount;
+      }
+
+      // CALCULATE CRASH POINT (RIGGED FOR 30% HOUSE EDGE)
+      // Standard fair formula: 0.99 / (1-r).
+      // 30% House Edge formula: 0.70 / (1-r).
+      // This means a significantly higher chance of instant crash or low multiplier.
+      const r = Math.random();
+      let crashPoint = 0.70 / (1 - r);
+      
+      // Cap max win
+      if (crashPoint > 100) crashPoint = 100;
+      if (crashPoint < 1) crashPoint = 1;
+
+      this.saveState(newState);
+      this.saveGlobalState(globalState);
+
+      return { success: true, newState, crashPoint };
+  }
+
+  static cashOutCrashGame(state: PlayerState, betAmount: number, multiplier: number, currency: 'NRC' | 'TON' | 'STARS' = 'NRC'): { success: boolean, newState?: PlayerState, payout?: number } {
+      const globalState = this.loadGlobalState();
+      const newState = { ...state };
+      
+      let payout = betAmount * multiplier;
+      
+      if (currency === 'NRC' || currency === 'STARS') payout = Math.floor(payout);
+
+      if (currency === 'NRC') {
+         if (globalState.rewardPoolNrc < payout) payout = globalState.rewardPoolNrc; 
+         globalState.rewardPoolNrc -= payout;
+         newState.balance += payout;
+      } else if (currency === 'TON') {
+         if (globalState.rewardPoolTon < payout) payout = globalState.rewardPoolTon;
+         globalState.rewardPoolTon -= payout;
+         newState.tonBalance += payout;
+      } else {
+         if (globalState.rewardPoolStars < payout) payout = globalState.rewardPoolStars;
+         globalState.rewardPoolStars -= payout;
+         newState.starsBalance += payout;
+      }
+
+      this.saveState(newState);
+      this.saveGlobalState(globalState);
+      
+      return { success: true, newState, payout };
+  }
 
   static claimDailyReward(state: PlayerState): { success: boolean, newState?: PlayerState, reward?: number, error?: string } {
     const globalState = this.loadGlobalState();
@@ -433,9 +540,9 @@ export class GameService {
           pool = globalState.rewardPoolStars;
       }
 
-      // 2. Weighted RNG Logic (Much harder to win)
+      // 2. Weighted RNG Logic
       const reelStrip = [
-          '7', 
+          '7', // Single 7 per strip
           '@', '@', 
           '#', '#', '#', '#', 
           '%', '%', '%', '%', '%', '%', 
@@ -444,18 +551,25 @@ export class GameService {
       
       const reel1 = reelStrip[Math.floor(Math.random() * reelStrip.length)];
       const reel2 = reelStrip[Math.floor(Math.random() * reelStrip.length)];
-      const reel3 = reelStrip[Math.floor(Math.random() * reelStrip.length)];
+      let reel3 = reelStrip[Math.floor(Math.random() * reelStrip.length)];
+      
+      // SECURITY: PREVENT JACKPOT (7-7-7)
+      // The user requested Jackpot Probability = 0%.
+      if (reel1 === '7' && reel2 === '7' && reel3 === '7') {
+          reel3 = '@'; // Force change the last reel to deny jackpot
+      }
       
       const result = [reel1, reel2, reel3];
       
       let payout = 0;
       let isJackpot = false;
 
-      // 3. Payout Table
+      // 3. Payout Table (Reduced frequency of small wins handled by randomness of strip)
       if (reel1 === reel2 && reel2 === reel3) {
           if (reel1 === '7') {
+              // This block is theoretically unreachable due to Security Check above
               isJackpot = true;
-              payout = Math.floor(pool * 0.10); // Jackpot 10%
+              payout = Math.floor(pool * 0.10); 
           } else if (reel1 === '@') {
               payout = betAmount * 15;
           } else if (reel1 === '#') {
@@ -520,27 +634,32 @@ export class GameService {
           globalState.rewardPoolStars += betAmount;
       }
 
-      // 2. Weighted RNG Logic
+      // 2. Weighted RNG Logic (RIGGED FOR 30% HOUSE EDGE, BUT WITH 0.5x MIN RETURN)
       const rand = Math.random() * 1000;
       let item = 'shard'; 
       let multiplier = 0;
 
-      if (rand < 600) { // 60% Chance -> LOSS (x0)
+      // RTP CALCULATION:
+      // Refund (0.5x) * 70%  = 0.35
+      // Small (1.1x) * 25%   = 0.275
+      // Mid (2.0x) * 4%      = 0.08
+      // Big (5.0x) * 1%      = 0.05
+      // Total Return: ~0.755 (75.5% RTP -> 24.5% House Edge)
+      
+      if (rand < 700) { // 70% Chance of Refund (Consolation)
           item = 'shard';
-          multiplier = 0; 
-      } else if (rand < 880) { // 28% Chance -> REFUND/SMALL WIN (x1.2)
+          multiplier = 0.5; // Changed from 0 to 0.5
+      } else if (rand < 950) { // 25% Small Win (x1.1)
           item = 'chip';
-          multiplier = 1.2;
-      } else if (rand < 960) { // 8% Chance -> WIN (x3)
+          multiplier = 1.1; // Reduced from 1.2
+      } else if (rand < 990) { // 4% Mid Win (x2)
           item = 'skull';
-          multiplier = 3.0;
-      } else if (rand < 995) { // 3.5% Chance -> BIG WIN (x10)
+          multiplier = 2.0; // Reduced from 3.0
+      } else if (rand <= 1000) { // 1% Big Win (x5)
           item = 'potion';
-          multiplier = 10.0;
-      } else { // 0.5% Chance -> JACKPOT (x50)
-          item = 'core';
-          multiplier = 50.0;
-      }
+          multiplier = 5.0; // Reduced from 10.0
+      } 
+      // CORE (Jackpot x50) removed from logic completely
       
       let payout = betAmount * multiplier;
       if (currency === 'NRC' || currency === 'STARS') payout = Math.floor(payout);
@@ -566,6 +685,80 @@ export class GameService {
       this.saveGlobalState(globalState);
 
       return { success: true, newState, resultItem: item, multiplier, payout };
+  }
+
+  static playNeonDice(state: PlayerState, betAmount: number, currency: 'NRC' | 'TON' | 'STARS' = 'NRC', prediction: 'low' | 'seven' | 'high'): { success: boolean, newState?: PlayerState, dice?: number[], payout?: number, message?: string } {
+      // CHECK BALANCE
+      if (currency === 'NRC' && state.balance < betAmount) return { success: false, message: 'Insufficient NRC' };
+      if (currency === 'TON' && state.tonBalance < betAmount) return { success: false, message: 'Insufficient TON' };
+      if (currency === 'STARS' && state.starsBalance < betAmount) return { success: false, message: 'Insufficient Stars' };
+
+      if (betAmount <= 0) return { success: false, message: 'Invalid Bet' };
+
+      const globalState = this.loadGlobalState();
+      const newState = { ...state };
+
+      // 1. Deduct Bet
+      if (currency === 'NRC') {
+          newState.balance -= betAmount;
+          globalState.rewardPoolNrc += betAmount;
+      } else if (currency === 'TON') {
+          newState.tonBalance -= betAmount;
+          globalState.rewardPoolTon += betAmount;
+      } else {
+          newState.starsBalance -= betAmount;
+          globalState.rewardPoolStars += betAmount;
+      }
+
+      // 2. Roll Dice (2d6)
+      const d1 = Math.ceil(Math.random() * 6);
+      const d2 = Math.ceil(Math.random() * 6);
+      const sum = d1 + d2;
+      
+      let payout = 0;
+      let won = false;
+      let multiplier = 0;
+
+      // RIGGED LOGIC FOR 30% HOUSE EDGE:
+      // Low/High Probability: 41.66%. Fair Payout: 2.4x. 
+      // Adjusted Payout for 30% edge: 2.4 * 0.7 = ~1.68 -> 1.7x
+      
+      // Seven Probability: 16.66%. Fair Payout: 6.0x.
+      // Adjusted Payout for 30% edge: 6.0 * 0.7 = 4.2x
+
+      if (prediction === 'low' && sum < 7) {
+          won = true;
+          multiplier = 1.7; // Decreased from 2.3
+      } else if (prediction === 'high' && sum > 7) {
+          won = true;
+          multiplier = 1.7; // Decreased from 2.3
+      } else if (prediction === 'seven' && sum === 7) {
+          won = true;
+          multiplier = 4.2; // Decreased from 5.8
+      }
+
+      if (won) {
+          payout = betAmount * multiplier;
+          
+          if (currency === 'NRC') {
+             if (globalState.rewardPoolNrc < payout) payout = globalState.rewardPoolNrc; 
+             globalState.rewardPoolNrc -= payout;
+             newState.balance += payout;
+          } else if (currency === 'TON') {
+             if (globalState.rewardPoolTon < payout) payout = globalState.rewardPoolTon;
+             globalState.rewardPoolTon -= payout;
+             newState.tonBalance += payout;
+          } else {
+             if (globalState.rewardPoolStars < payout) payout = globalState.rewardPoolStars;
+             globalState.rewardPoolStars -= payout;
+             newState.starsBalance += payout;
+          }
+      }
+
+      this.saveState(newState);
+      this.saveGlobalState(globalState);
+
+      return { success: true, newState, dice: [d1, d2], payout };
   }
 
   static exchangeCurrency(state: PlayerState, amountNrc: number, type: 'buy' | 'sell'): { success: boolean, newState?: PlayerState, message?: string } {
@@ -644,8 +837,7 @@ export class GameService {
       return { success: true, newState };
   }
 
-  // --- GLOBAL STATE ---
-  
+  // ... (Other backend methods remain same)
   static addQuest(quest: Quest) {
       const global = this.loadGlobalState();
       global.quests.push(quest);
@@ -793,22 +985,45 @@ export class GameService {
     
     if (now - lastTime > 60000) {
         // Random tiny walk: +/- 0.5%
-        const walk = (Math.random() - 0.5) * (price * 0.005);
-        price += walk;
+        // Removed random walk to disable fake activity
+        // const walk = (Math.random() - 0.5) * (price * 0.005);
+        // price += walk;
         if (price < 0.000001) price = 0.000001;
         
         global.currentPrice = price;
-        global.priceHistory.push({ time: now, price });
+        global.priceHistory.push({ time: now, price: price });
         
         // Clean up history > 2000 points
         if (global.priceHistory.length > 2000) global.priceHistory.shift();
         
+        // --- SIMULATE GLOBAL ACTIVITY ---
+        // Removed leaderboard update
+        
         this.saveGlobalState(global);
     }
     
+    // --- MERGE USER INTO LEADERBOARD ---
+    // Remove existing "you" entries first if any
+    const pureBots = global.leaderboard.filter(e => !e.isUser);
+    
+    // Add real user
+    const userEntry: LeaderboardEntry = {
+        id: 'user_real',
+        name: 'You',
+        balance: playerBalance,
+        isUser: true
+    };
+    
+    // Sort and limit to 50 for performance
+    const mergedLeaderboard = [...pureBots, userEntry]
+        .sort((a, b) => b.balance - a.balance)
+        .slice(0, 50)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
     return {
       ...global,
-      currentPrice: price
+      currentPrice: price,
+      leaderboard: mergedLeaderboard
     };
   }
 }
