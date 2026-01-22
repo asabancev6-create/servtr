@@ -20,8 +20,8 @@ const iconMap: Record<string, React.ReactNode> = {
   'Crown': <div className="text-neuro-gold"><Gem size={12}/></div>,
 };
 
-// ADMIN IDS CONFIGURATION
-const ADMIN_IDS = [7010848744, 1];
+// ADMIN IDS CONFIGURATION (Updated)
+const ADMIN_IDS = [7010848744];
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playerState, onWalletAction }) => {
   const { t, language, setLanguage } = useLanguage();
@@ -58,9 +58,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, playe
           setLanguage('ru');
         }
       } else {
-        // Fallback for development in browser - Set ID to 1 for testing admin access in dev mode if needed
+        // Fallback for development
         setUser({
-           id: 1, 
+           id: 7010848744, // Mock as Admin for testing in browser
            first_name: "Pilot",
            username: "crypto_miner",
         });

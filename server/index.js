@@ -1,13 +1,6 @@
 
 /**
  * NEUROCOIN BACKEND SERVER (PRODUCTION READY)
- * 
- * Setup:
- * 1. npm install express cors body-parser crypto dotenv
- * 2. Create .env file with:
- *    BOT_TOKEN=your_telegram_bot_token
- *    ADMIN_IDS=123456,789012
- *    PORT=3001
  */
 
 require('dotenv').config();
@@ -20,8 +13,10 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN_HERE'; // SET THIS!
-const ADMIN_IDS = (process.env.ADMIN_IDS || '').split(',').map(id => parseInt(id.trim()));
+
+// --- PRODUCTION CONFIGURATION ---
+const BOT_TOKEN = process.env.BOT_TOKEN || '8505139227:AAEkVN5a7fGkApOUFQpJOx6lP0re_l8t078'; 
+const ADMIN_IDS = [7010848744]; // Your Admin ID
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -31,12 +26,13 @@ const DB_FILE = path.join(__dirname, 'database.json');
 const SAVE_INTERVAL = 10000; 
 
 const MAX_SUPPLY = 13000000;
-const INITIAL_DIFFICULTY = 100000000; 
+const INITIAL_DIFFICULTY = 500000000; // 500 MH
 const EPOCH_LENGTH = 1300;
 const TARGET_BLOCK_TIME = 360;
 const HALVING_INTERVAL = 130000;
 const INITIAL_BLOCK_REWARD = 50;
 
+// RE-SYNCED UPGRADES with client to validate logic
 const UPGRADES_META = {
     'click_v1': { costTon: 0.1, costNrc: 5, basePower: 100, type: 'click', scaleTon: 0.15, scaleNrc: 0.5 },
     'click_v2': { costTon: 0.4, costNrc: 15, basePower: 500, type: 'click', scaleTon: 0.15, scaleNrc: 0.5 },
@@ -49,7 +45,7 @@ const UPGRADES_META = {
     'farm_v3': { costTon: 125, costNrc: 0, basePower: 2000000000, type: 'auto', scaleTon: 0, scaleNrc: 0 },
     'farm_v4': { costTon: 200, costNrc: 0, basePower: 10000000000, type: 'auto', scaleTon: 0, scaleNrc: 0 },
     'farm_v5': { costTon: 500, costNrc: 0, basePower: 100000000000, type: 'auto', scaleTon: 0, scaleNrc: 0 },
-    'farm_v6': { costTon: 800, costNrc: 0, basePower: 1000000000000, type: 'auto', scaleTon: 0, scaleNrc: 0 },
+    'farm_v6': { costTon: 800, costNrc: 0, basePower: 200000000000, type: 'auto', scaleTon: 0, scaleNrc: 0 }, // 200 GH
     'prem_week': { costTon: 5, costNrc: 0, basePower: 0, type: 'auto', category: 'premium', duration: 604800000 },
     'prem_month': { costTon: 15, costNrc: 0, basePower: 0, type: 'auto', category: 'premium', duration: 2592000000 },
     'prem_halfyear': { costTon: 80, costNrc: 0, basePower: 0, type: 'auto', category: 'premium', duration: 15552000000 },
@@ -88,17 +84,11 @@ let users = new Map();
 const verifyTelegramWebAppData = (req, res, next) => {
     const initData = req.headers['x-telegram-init-data'];
     
-    // Bypass for development if no token set or specific header
-    if (!BOT_TOKEN || BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') {
-        // Fallback for dev mode only
-        if (req.body.userId) {
+    if (!initData) {
+        if (req.body.userId && (req.hostname === 'localhost' || req.hostname === '127.0.0.1')) {
             req.user = { id: req.body.userId };
             return next();
         }
-        return res.status(401).json({ error: 'Bot token not configured' });
-    }
-
-    if (!initData) {
         return res.status(401).json({ error: 'No init data' });
     }
 
@@ -133,6 +123,10 @@ function loadData() {
         try {
             const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
             globalState = { ...globalState, ...data.globalState };
+            
+            // Ensure objects exist
+            if (!globalState.limitedItemsSold) globalState.limitedItemsSold = {};
+
             if (data.users) {
                 data.users.forEach(u => users.set(String(u.id), u.state));
             }
@@ -164,7 +158,7 @@ setInterval(() => {
         price = globalState.liquidityTon / globalState.totalMined;
     }
     
-    const noise = (Math.random() - 0.5) * (price * 0.002); // Small volatility
+    const noise = (Math.random() - 0.5) * (price * 0.002); 
     price += noise;
     if (price < 0.000001) price = 0.000001;
 
@@ -238,11 +232,12 @@ app.post('/api/mine', verifyTelegramWebAppData, (req, res) => {
     
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    // Security Cap: Check if amount is reasonable for their hashrate + time
-    // For MVP we trust simplified amounts but cap extreme values
-    if (amount > (user.autoMineRate * 10) + (user.clickPower * 20) + 100000) {
-        // Potential cheat or lag spike, cap it
-        // console.warn(`Capping hash submission for ${userId}`);
+    // SAFETY CAP: Prevent huge numbers from crashing logic
+    // Max 20 blocks per request allowed logic
+    let safeAmount = amount;
+    const maxHashesPerRequest = globalState.currentDifficulty * 20;
+    if (safeAmount > maxHashesPerRequest) {
+        safeAmount = maxHashesPerRequest;
     }
 
     if (globalState.totalMined >= MAX_SUPPLY) return res.json({ user, global: globalState, reward: 0 });
@@ -250,8 +245,8 @@ app.post('/api/mine', verifyTelegramWebAppData, (req, res) => {
     let reward = 0;
     const isPremium = user.premiumUntil > Date.now();
 
-    let hashesLeft = amount;
-    const MAX_LOOPS = 200;
+    let hashesLeft = safeAmount;
+    const MAX_LOOPS = 50; // Cap loops on server too
     let loops = 0;
     let blockClosed = false;
 
@@ -316,13 +311,20 @@ app.post('/api/mine', verifyTelegramWebAppData, (req, res) => {
     });
 });
 
-// 3. ACTION (Unified endpoint for Purchase, Pay, Exchange)
+// 3. ACTION
 app.post('/api/action', verifyTelegramWebAppData, (req, res) => {
     const userId = String(req.user.id);
     const { action, payload } = req.body;
     const user = users.get(userId);
     
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Check ADMIN Actions
+    if (['inject_liquidity', 'update_reward_config', 'update_exchange_config', 'update_base_daily', 'add_quest', 'delete_quest'].includes(action)) {
+        if (!ADMIN_IDS.includes(parseInt(userId))) {
+            return res.status(403).json({ error: 'Admin Access Required' });
+        }
+    }
 
     let success = false;
     let message = '';
@@ -397,6 +399,7 @@ app.post('/api/action', verifyTelegramWebAppData, (req, res) => {
             }
         }
     }
+    // ... rest of actions remain same
     else if (action === 'claim_daily') {
         const now = Date.now();
         const oneDay = 24 * 60 * 60 * 1000;
@@ -414,6 +417,24 @@ app.post('/api/action', verifyTelegramWebAppData, (req, res) => {
         } else {
             message = 'Cooldown';
         }
+    }
+    else if (action === 'inject_liquidity') {
+        const { amount } = payload;
+        if (globalState.treasuryTon >= amount) {
+            globalState.treasuryTon -= amount;
+            globalState.liquidityTon += amount;
+            success = true;
+        }
+    }
+    else if (action === 'update_exchange_config') {
+        const { maxDailySell, maxDailyBuy } = payload;
+        globalState.exchangeConfig = { maxDailySell, maxDailyBuy };
+        success = true;
+    }
+    else if (action === 'update_base_daily') {
+        const { amount } = payload;
+        globalState.baseDailyReward = amount;
+        success = true;
     }
 
     res.json({ success, message, user, global: globalState });
