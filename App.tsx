@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerState, GlobalStats, Tab } from './types';
-import { GameService } from './services/mockBackend';
+import { GameService } from './services/mockBackend'; // Now points to our API Client wrapper
 import { GLOBAL_REFRESH_RATE, INITIAL_STATE, INITIAL_BLOCK_REWARD, HALVING_INTERVAL, MAX_SUPPLY } from './constants';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Layout from './components/ui/Layout';
@@ -15,61 +16,66 @@ import Games from './components/Games';
 const GameContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.MINER);
   const [playerState, setPlayerState] = useState<PlayerState>(INITIAL_STATE);
-  
-  // Initial Global Stats - Sync immediately
   const [globalStats, setGlobalStats] = useState<GlobalStats>(GameService.getGlobalStats(0));
   
   const stateRef = useRef(playerState);
   const globalStatsRef = useRef(globalStats);
 
-  // Initialize
+  // --- INITIALIZATION ---
   useEffect(() => {
-    const loaded = GameService.loadState();
-    setPlayerState(loaded);
-    stateRef.current = loaded;
+    const initGame = async () => {
+        // Try to get Telegram User ID
+        let userId = 'guest';
+        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+            userId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
+        }
+
+        const data = await GameService.init(userId);
+        setPlayerState(data.user);
+        stateRef.current = data.user;
+        
+        setGlobalStats(data.global);
+        globalStatsRef.current = data.global;
+    };
     
-    // Initial fetch of global stats to ensure UI is in sync
-    const gStats = GameService.getGlobalStats(loaded.balance);
-    setGlobalStats(gStats);
-    globalStatsRef.current = gStats;
+    initGame();
   }, []);
 
-  // --- CORE MINING ENGINE (SHARED LEDGER) ---
+  // --- SYNC LOOP (Background) ---
+  useEffect(() => {
+      // Sync mining progress to server every 3 seconds
+      const syncInterval = setInterval(async () => {
+          const syncedData = await GameService.syncWithServer();
+          if (syncedData) {
+              setPlayerState(syncedData.user);
+              stateRef.current = syncedData.user;
+              
+              setGlobalStats(syncedData.global);
+              globalStatsRef.current = syncedData.global;
+          }
+      }, 3000);
+
+      return () => clearInterval(syncInterval);
+  }, []);
+
+  // --- CLIENT MINING LOOP (Visuals + Accumulation) ---
   const processHash = (amount: number, currentState: PlayerState): PlayerState => {
-    // Send hash to backend (simulation) to update Global Chain
+    // Submit hashes to service (which accumulates them)
     const { newPlayerState, blockClosed } = GameService.submitHashes(amount, currentState);
     
     if (blockClosed) {
         if (window.Telegram?.WebApp?.HapticFeedback) {
              window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
-        // Immediately fetch updated global stats to show new block height/difficulty
-        const gStats = GameService.getGlobalStats(newPlayerState.balance);
-        setGlobalStats(gStats);
-        globalStatsRef.current = gStats;
     }
-
     return newPlayerState;
   };
 
-  // --- 1. USER AUTO-MINER LOOP ---
   useEffect(() => {
     const interval = setInterval(() => {
       const current = stateRef.current;
       
-      // Periodic achievement check (every 3 seconds roughly based on modulo)
-      const now = Date.now();
-      if (now % 3000 < 250) {
-         const checkedState = GameService.checkAchievements(current);
-         if (checkedState !== current) {
-             setPlayerState(checkedState);
-             stateRef.current = checkedState;
-             return;
-         }
-      }
-
       if (current.autoMineRate > 0) {
-        // Slower tick for UI performance
         const hashAmount = current.autoMineRate / 5; // 5 times a second
         const newState = processHash(hashAmount, current); 
         setPlayerState(newState);
@@ -77,19 +83,6 @@ const GameContent: React.FC = () => {
       }
     }, 200);
 
-    return () => clearInterval(interval);
-  }, []);
-
-  // Global Stats Fetch Loop (Sync with "Network")
-  const fetchGlobal = () => {
-    const stats = GameService.getGlobalStats(stateRef.current.balance);
-    setGlobalStats(stats);
-    globalStatsRef.current = stats; 
-  };
-
-  useEffect(() => {
-    fetchGlobal();
-    const interval = setInterval(fetchGlobal, GLOBAL_REFRESH_RATE);
     return () => clearInterval(interval);
   }, []);
 
@@ -113,7 +106,6 @@ const GameContent: React.FC = () => {
     
     if (result.success && result.newState) {
       handleStateUpdate(result.newState);
-      fetchGlobal(); 
       if(window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
       }
@@ -131,18 +123,11 @@ const GameContent: React.FC = () => {
       
       if (result.success && result.newState) {
           handleStateUpdate(result.newState);
-          fetchGlobal(); 
           if(window.Telegram?.WebApp?.HapticFeedback) {
              window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
           }
-          const msg = type === 'sell' 
-            ? `Exchange: Sold ${amount} NRC.` 
-            : `Exchange: Bought ${amount} NRC.`;
-          alert(msg);
+          alert('Exchange Successful');
       } else {
-          if(window.Telegram?.WebApp?.HapticFeedback) {
-             window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
-          }
           alert(`Exchange Failed: ${result.message}`);
       }
   };
@@ -150,36 +135,26 @@ const GameContent: React.FC = () => {
   const handleWalletAction = (type: 'connect' | 'disconnect' | 'add_ton' | 'add_stars', amount?: number) => {
       setPlayerState(prev => {
           let newState = { ...prev };
-          if (type === 'connect') {
-              newState.walletAddress = "UQDt...8s3A";
-              if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-          } else if (type === 'disconnect') {
-              newState.walletAddress = null;
-              if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
-          } else if (type === 'add_ton') {
-               if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-              const val = amount || 1.5;
-              newState.tonBalance += val;
-              alert(`Payment simulated: +${val} TON`);
-          } else if (type === 'add_stars') {
-               if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-              newState.starsBalance += 250;
-              alert("Payment simulated: +250 Stars");
-          }
+          if (type === 'connect') newState.walletAddress = "UQDt...8s3A";
+          else if (type === 'disconnect') newState.walletAddress = null;
+          else if (type === 'add_ton') newState.tonBalance += (amount || 1.5);
+          else if (type === 'add_stars') newState.starsBalance += 250;
+          
           stateRef.current = newState;
           return newState;
       });
   };
 
-  // Claim Achievement
   const handleClaimAchievement = (id: string) => {
       const result = GameService.claimAchievementReward(stateRef.current, id);
       if (result.success && result.newState) {
           handleStateUpdate(result.newState);
-           if(window.Telegram?.WebApp?.HapticFeedback) {
-             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-          }
       }
+  };
+
+  // Mock refresh needed for components that pull directly
+  const fetchGlobal = () => {
+      setGlobalStats(GameService.getGlobalStats(stateRef.current.balance));
   };
 
   const renderContent = () => {
