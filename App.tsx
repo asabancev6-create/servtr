@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerState, GlobalStats, Tab } from './types';
 import { GameService } from './services/mockBackend';
-import { GLOBAL_REFRESH_RATE, INITIAL_STATE, INITIAL_BLOCK_REWARD, HALVING_INTERVAL, MAX_SUPPLY } from './constants';
+import { GLOBAL_REFRESH_RATE, INITIAL_STATE } from './constants';
 import { LanguageProvider } from './contexts/LanguageContext';
 import Layout from './components/ui/Layout';
 import Miner from './components/Miner';
@@ -16,8 +17,8 @@ const GameContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.MINER);
   const [playerState, setPlayerState] = useState<PlayerState>(INITIAL_STATE);
   
-  // Initial Global Stats - Sync immediately
-  const [globalStats, setGlobalStats] = useState<GlobalStats>(GameService.getGlobalStats(0));
+  // Initial Global Stats - Default 0 then sync
+  const [globalStats, setGlobalStats] = useState<GlobalStats>(GameService.getGlobalStats(0) as any);
   
   const stateRef = useRef(playerState);
   const globalStatsRef = useRef(globalStats);
@@ -28,28 +29,28 @@ const GameContent: React.FC = () => {
     setPlayerState(loaded);
     stateRef.current = loaded;
     
-    // Initial fetch of global stats to ensure UI is in sync
-    const gStats = GameService.getGlobalStats(loaded.balance);
-    setGlobalStats(gStats);
-    globalStatsRef.current = gStats;
+    // Initial fetch
+    fetchGlobal();
   }, []);
 
   // --- CORE MINING ENGINE (SHARED LEDGER) ---
-  const processHash = (amount: number, currentState: PlayerState): PlayerState => {
-    // Send hash to backend (simulation) to update Global Chain
-    const { newPlayerState, blockClosed } = GameService.submitHashes(amount, currentState);
+  const processHash = async (amount: number, currentState: PlayerState) => {
+    // Send hash to backend 
+    const { newPlayerState, blockClosed } = await GameService.submitHashes(amount, currentState);
+    
+    // Update local state with the accumulated lifetime hashes
+    setPlayerState(prev => ({
+        ...prev,
+        lifetimeHashes: newPlayerState.lifetimeHashes
+    }));
+    stateRef.current = { ...stateRef.current, lifetimeHashes: newPlayerState.lifetimeHashes };
     
     if (blockClosed) {
         if (window.Telegram?.WebApp?.HapticFeedback) {
              window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
-        // Immediately fetch updated global stats to show new block height/difficulty
-        const gStats = GameService.getGlobalStats(newPlayerState.balance);
-        setGlobalStats(gStats);
-        globalStatsRef.current = gStats;
+        fetchGlobal(); // Force immediate refresh if block found
     }
-
-    return newPlayerState;
   };
 
   // --- 1. USER AUTO-MINER LOOP ---
@@ -57,23 +58,20 @@ const GameContent: React.FC = () => {
     const interval = setInterval(() => {
       const current = stateRef.current;
       
-      // Periodic achievement check (every 3 seconds roughly based on modulo)
       const now = Date.now();
+      // Periodic achievement check
       if (now % 3000 < 250) {
          const checkedState = GameService.checkAchievements(current);
          if (checkedState !== current) {
              setPlayerState(checkedState);
              stateRef.current = checkedState;
-             return;
          }
       }
 
       if (current.autoMineRate > 0) {
-        // Slower tick for UI performance
+        // Slower tick for UI performance but accurate hashing
         const hashAmount = current.autoMineRate / 5; // 5 times a second
-        const newState = processHash(hashAmount, current); 
-        setPlayerState(newState);
-        stateRef.current = newState;
+        processHash(hashAmount, current); 
       }
     }, 200);
 
@@ -81,8 +79,8 @@ const GameContent: React.FC = () => {
   }, []);
 
   // Global Stats Fetch Loop (Sync with "Network")
-  const fetchGlobal = () => {
-    const stats = GameService.getGlobalStats(stateRef.current.balance);
+  const fetchGlobal = async () => {
+    const stats = await GameService.getGlobalStats(stateRef.current.balance);
     setGlobalStats(stats);
     globalStatsRef.current = stats; 
   };
@@ -95,11 +93,7 @@ const GameContent: React.FC = () => {
 
   // Actions
   const handleMine = () => {
-    setPlayerState(prev => {
-      const newState = processHash(prev.clickPower, prev);
-      stateRef.current = newState;
-      return newState;
-    });
+    processHash(stateRef.current.clickPower, stateRef.current);
   };
 
   const handleStateUpdate = (newState: PlayerState) => {

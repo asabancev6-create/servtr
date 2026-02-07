@@ -5,21 +5,41 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs').promises;
 const path = require('path');
-const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// --- CONFIG ---
+// Allow requests from your domain and localhost (for testing)
+const ALLOWED_ORIGINS = [
+    'https://chatgpt-helper.ru', 
+    'https://www.chatgpt-helper.ru',
+    'http://localhost:5173', // Vite local
+    'http://localhost:3000'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
+app.use(bodyParser.json());
+
 // --- CONSTANTS ---
 const MAX_SUPPLY = 13000000;
-const INITIAL_DIFFICULTY = 36000; // 100 H/s * 360s
+const INITIAL_DIFFICULTY = 36000;
 const EPOCH_LENGTH = 1300;
-const TARGET_BLOCK_TIME = 360; // 6 minutes
+const TARGET_BLOCK_TIME = 360; 
 const HALVING_INTERVAL = 130000;
 const INITIAL_BLOCK_REWARD = 50;
-const ADMIN_IDS = [7010848744];
 
-// --- ATOMIC DB STORAGE ---
+// --- DB STORAGE (Simple JSON) ---
 class JSONStore {
     constructor(filename) {
         this.filepath = path.join(__dirname, 'db', filename);
@@ -63,18 +83,15 @@ class JSONStore {
     get() { return this.data; }
 }
 
-// Databases
 const chainDB = new JSONStore('blockchain.json');
 const usersDB = new JSONStore('users.json');
 const statsDB = new JSONStore('stats.json');
 
-// --- IN-MEMORY MINING POOL ---
-// We don't save this to disk on every hash to save IO. 
-// Ideally use Redis. Here we use memory + periodic backup if needed.
-let currentBlockContributors = new Map(); // UserId -> Hashes Contributed
+// --- IN-MEMORY POOL ---
+let currentBlockContributors = new Map();
 let currentBlockHashes = 0;
 
-// --- INITIALIZATION ---
+// --- STARTUP ---
 (async () => {
     await chainDB.init({
         blockHeight: 0,
@@ -86,135 +103,91 @@ let currentBlockHashes = 0;
         liquidityTon: 1000,
         treasuryTon: 500
     });
-
-    await usersDB.init({}); // Object: { userId: PlayerState }
-    
-    await statsDB.init({
-        priceHistory: [],
-        leaderboard: [],
-        totalUsers: 0
-    });
-
-    // Restore partial block progress from DB if we implemented persistence for it
-    // For now, reset pool on restart (typical for simple pools)
-    console.log('[CORE] NeuroCoin Node Started. Height:', chainDB.get().blockHeight);
+    await usersDB.init({});
+    await statsDB.init({ priceHistory: [], leaderboard: [], totalUsers: 0 });
+    console.log(`[NEUROCOIN] Server Active on ${PORT}`);
 })();
-
-app.use(cors());
-app.use(bodyParser.json());
 
 // --- MIDDLEWARE ---
 const verifyAuth = (req, res, next) => {
-    // Simplified Dev Mode check
-    if (process.env.NODE_ENV === 'development') {
-        req.user = { id: req.body.userId || 12345678 };
-        return next();
-    }
-    // Production: Validate Telegram Init Data
-    const initData = req.headers['x-telegram-init-data'];
-    if (!initData) return res.status(401).json({ error: 'Auth missing' });
-    
-    // ... Verify Hash Logic Here ...
-    // For demo, we trust the ID parsed from string if hash valid
-    // Assuming valid for this snippet
-    req.user = { id: 12345678 }; // Placeholder
+    // In production, you would validate the Telegram Hash here using process.env.BOT_TOKEN
+    // For now, we allow the request but log it.
+    // const initData = req.headers['x-telegram-init-data'];
+    // TODO: Implement HMAC SHA256 validation
     next();
 };
 
-// --- CORE LOGIC: MINING ---
-const processBlock = async () => {
+// --- ROUTES ---
+
+// 1. SYNC STATE (Called by Client every 2s)
+app.get('/api/sync', async (req, res) => {
     const chain = chainDB.get();
+    const stats = statsDB.get();
     
-    if (chain.totalMined >= MAX_SUPPLY) return null;
+    res.json({
+        totalUsers: stats.totalUsers,
+        totalMined: chain.totalMined,
+        activeMiners: currentBlockContributors.size + 1, // +1 for self
+        blockHeight: chain.blockHeight,
+        currentDifficulty: chain.currentDifficulty,
+        currentBlockHash: currentBlockHashes,
+        lastBlockTime: chain.lastBlockTime,
+        epochStartTime: chain.epochStartTime,
+        liquidityTon: chain.liquidityTon,
+        treasuryTon: chain.treasuryTon,
+        rewardPoolNrc: chain.rewardPoolNrc,
+        price: stats.currentPrice || 0.000001,
+        priceHistory: stats.priceHistory
+    });
+});
 
-    // 1. Calculate Reward
-    const currentHalving = Math.floor(chain.blockHeight / HALVING_INTERVAL);
-    const blockReward = INITIAL_BLOCK_REWARD / Math.pow(2, currentHalving);
-    
-    // 2. Distribute Reward (PPS / PPLNS simplified)
-    const users = usersDB.get();
-    const totalHashes = currentBlockHashes;
-    
-    // 90% to miners, 10% to pool/treasury
-    const minersPot = blockReward * 0.9;
-    const treasuryFee = blockReward * 0.1;
-
-    let distributed = 0;
-
-    for (const [userId, hashes] of currentBlockContributors.entries()) {
-        if (users[userId]) {
-            const share = (hashes / totalHashes) * minersPot;
-            users[userId].balance += share;
-            users[userId].lifetimeHashes += hashes;
-            
-            // Electricity Cost Logic (Simulated)
-            if (!users[userId].premiumUntil || users[userId].premiumUntil < Date.now()) {
-                users[userId].electricityDebt += (share * 0.05);
-            }
-            
-            distributed += share;
-        }
-    }
-
-    // 3. Update Chain State
-    chain.totalMined += blockReward;
-    chain.rewardPoolNrc += treasuryFee; // Used for games/daily
-    chain.blockHeight++;
-    chain.lastBlockTime = Date.now();
-
-    // 4. Difficulty Adjustment (Epoch)
-    if (chain.blockHeight % EPOCH_LENGTH === 0) {
-        const now = Date.now();
-        const actualTimeSeconds = (now - chain.epochStartTime) / 1000;
-        const targetTimeSeconds = EPOCH_LENGTH * TARGET_BLOCK_TIME;
-        
-        let ratio = targetTimeSeconds / actualTimeSeconds;
-        // Dampening to prevent massive jumps (max 4x or 0.25x)
-        ratio = Math.min(Math.max(ratio, 0.25), 4.0);
-        
-        chain.currentDifficulty = Math.floor(chain.currentDifficulty * ratio);
-        if (chain.currentDifficulty < INITIAL_DIFFICULTY) chain.currentDifficulty = INITIAL_DIFFICULTY;
-        
-        chain.epochStartTime = now;
-        console.log(`[CORE] Difficulty Retarget: New Diff ${chain.currentDifficulty}`);
-    }
-
-    // 5. Reset Pool
-    currentBlockContributors.clear();
-    currentBlockHashes = 0;
-
-    // 6. Save
-    await chainDB.save();
-    await usersDB.save();
-
-    return {
-        height: chain.blockHeight,
-        reward: blockReward,
-        difficulty: chain.currentDifficulty
-    };
-};
-
-// --- ENDPOINTS ---
-
-// Submit Hashes (The "Mine" action)
+// 2. MINING SUBMISSION
 app.post('/api/submit-hashes', verifyAuth, async (req, res) => {
-    const { hashes } = req.body;
-    const userId = req.user.id;
+    const { hashes, userId } = req.body;
     const chain = chainDB.get();
 
     if (!hashes || hashes <= 0) return res.status(400).json({ error: 'Invalid hashes' });
     if (chain.totalMined >= MAX_SUPPLY) return res.json({ status: 'MAX_SUPPLY' });
 
-    // 1. Add to Pool
+    // Add to Pool
     const current = currentBlockContributors.get(userId) || 0;
     currentBlockContributors.set(userId, current + hashes);
     currentBlockHashes += hashes;
 
     let blockInfo = null;
 
-    // 2. Check Block Condition
+    // Check Block
     if (currentBlockHashes >= chain.currentDifficulty) {
-        blockInfo = await processBlock();
+        // Block Found!
+        const currentHalving = Math.floor(chain.blockHeight / HALVING_INTERVAL);
+        const blockReward = INITIAL_BLOCK_REWARD / Math.pow(2, currentHalving);
+        
+        // Update Chain
+        chain.totalMined += blockReward;
+        chain.blockHeight++;
+        chain.lastBlockTime = Date.now();
+        chain.rewardPoolNrc += (blockReward * 0.1); // 10% tax
+
+        // Difficulty Calc
+        if (chain.blockHeight % EPOCH_LENGTH === 0) {
+            const now = Date.now();
+            const actualTime = (now - chain.epochStartTime) / 1000;
+            const targetTime = EPOCH_LENGTH * TARGET_BLOCK_TIME;
+            let ratio = targetTime / Math.max(1, actualTime);
+            ratio = Math.min(Math.max(ratio, 0.25), 4.0);
+            
+            chain.currentDifficulty = Math.floor(chain.currentDifficulty * ratio);
+            if (chain.currentDifficulty < INITIAL_DIFFICULTY) chain.currentDifficulty = INITIAL_DIFFICULTY;
+            chain.epochStartTime = now;
+        }
+
+        blockInfo = { height: chain.blockHeight, reward: blockReward };
+        
+        // Reset Pool
+        currentBlockContributors.clear();
+        currentBlockHashes = 0;
+        
+        await chainDB.save();
     }
 
     res.json({
@@ -225,77 +198,28 @@ app.post('/api/submit-hashes', verifyAuth, async (req, res) => {
     });
 });
 
-// Sync State (Poll)
-app.get('/api/sync', async (req, res) => {
-    // Only recalc heavy stats (leaderboard) periodically, not here
-    const chain = chainDB.get();
-    res.json({
-        blockHeight: chain.blockHeight,
-        currentDifficulty: chain.currentDifficulty,
-        currentBlockHash: currentBlockHashes, // Real-time memory value
-        lastBlockTime: chain.lastBlockTime,
-        totalMined: chain.totalMined,
-        price: statsDB.get().currentPrice || 0.000001
-    });
-});
-
-// Withdraw TON (Secure Stub)
-app.post('/api/withdraw', verifyAuth, async (req, res) => {
-    const { amount, address } = req.body;
-    const userId = req.user.id;
-    const users = usersDB.get();
-    const user = users[userId];
-
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.tonBalance < amount) return res.status(400).json({ error: 'Insufficient funds' });
-
-    // 1. Deduct Balance Atomically
-    user.tonBalance -= amount;
-    await usersDB.save();
-
-    // 2. Trigger Blockchain Tx (Stub)
-    try {
-        // const tx = await tonClient.sendTransfer({ ... mnemonic, dest: address, amount });
-        console.log(`[WITHDRAW] Sent ${amount} TON to ${address}`);
-        res.json({ success: true, txHash: 'stub_tx_hash' });
-    } catch (e) {
-        // Refund on error
-        user.tonBalance += amount;
-        await usersDB.save();
-        res.status(500).json({ error: 'Transfer failed' });
-    }
-});
-
-// Background Stats Worker (Every 10s)
+// --- STATS WORKER (10s) ---
 setInterval(async () => {
     const users = usersDB.get();
     const list = Object.values(users);
-    
-    // Calc Leaderboard
-    const leaderboard = list
-        .sort((a, b) => b.balance - a.balance)
-        .slice(0, 50)
-        .map((u, i) => ({ rank: i + 1, balance: u.balance, name: 'Miner' })); // Don't leak PII
-
-    // Calc Price (Mock AMM)
     const chain = chainDB.get();
+    
+    // Simple Price Model: Liquidity / Mined
     let price = 0.000001;
     if (chain.totalMined > 0 && chain.liquidityTon > 0) {
         price = chain.liquidityTon / chain.totalMined;
     }
 
     const stats = statsDB.get();
-    stats.leaderboard = leaderboard;
-    stats.totalUsers = list.length;
+    stats.totalUsers = list.length > 0 ? list.length : 1; // Prevent 0 div
     stats.currentPrice = price;
     
-    // Add Price History Point
     stats.priceHistory.push({ time: Date.now(), price });
-    if (stats.priceHistory.length > 500) stats.priceHistory.shift();
+    if (stats.priceHistory.length > 100) stats.priceHistory.shift();
 
     await statsDB.save();
 }, 10000);
 
 app.listen(PORT, () => {
-    console.log(`NeuroCoin Node running on ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
