@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, TooltipProps, CartesianGrid, ComposedChart, Line, ReferenceLine } from 'recharts';
 import { PlayerState, GlobalStats, TelegramUser } from '../types';
@@ -176,109 +175,6 @@ const Investments: React.FC<InvestmentsProps> = ({ playerState, globalStats }) =
   // Colors for Chart
   const chartColor = trend === 'up' ? '#00ff41' : '#ff3b30'; // Neon Green : Neon Red
   const gradientId = trend === 'up' ? 'colorUp' : 'colorDown';
-
-  // --- LEADERBOARD RENDER LOGIC ---
-  const renderLeaderboard = () => {
-      // Take top 10 for display
-      const topMiners = globalStats.leaderboard.slice(0, 10);
-      
-      return (
-          <div className="flex flex-col gap-2">
-              {topMiners.map((miner, index) => {
-                  const isUser = miner.isUser;
-                  const rank = miner.rank || index + 1;
-                  
-                  // Styling for Top 3
-                  let rankStyle = "bg-white/5 border-white/10 text-white";
-                  let rankBadge = "bg-white/10 text-slate-400";
-                  let glow = "";
-                  
-                  if (rank === 1) {
-                      rankStyle = "bg-neuro-gold/10 border-neuro-gold text-neuro-gold";
-                      rankBadge = "bg-neuro-gold text-black";
-                      glow = "shadow-[0_0_15px_rgba(255,184,0,0.2)]";
-                  } else if (rank === 2) {
-                      rankStyle = "bg-slate-300/10 border-slate-300 text-slate-200";
-                      rankBadge = "bg-slate-300 text-black";
-                  } else if (rank === 3) {
-                      rankStyle = "bg-orange-700/10 border-orange-700 text-orange-200";
-                      rankBadge = "bg-orange-700 text-black";
-                  } else if (isUser) {
-                      rankStyle = "bg-neuro-cyan/10 border-neuro-cyan text-neuro-cyan";
-                      rankBadge = "bg-neuro-cyan text-black";
-                      glow = "shadow-[0_0_10px_rgba(0,240,255,0.2)]";
-                  }
-
-                  return (
-                    <div 
-                        key={miner.id} 
-                        className={`
-                            relative flex items-center justify-between p-3 rounded-xl border transition-all
-                            ${rankStyle} ${glow}
-                        `}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs font-mono ${rankBadge}`}>
-                                {rank}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center overflow-hidden">
-                                    {isUser && user?.photo_url ? (
-                                        <img src={user.photo_url} alt="You" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <UserCircle2 size={18} className={isUser ? "text-neuro-cyan" : "text-slate-500"} />
-                                    )}
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className={`text-xs font-bold ${isUser ? 'text-white' : 'text-slate-300'}`}>
-                                        {isUser ? (user?.first_name || 'You') : miner.name}
-                                        {isUser && <span className="ml-1 text-[9px] bg-neuro-cyan/20 px-1 rounded text-neuro-cyan">YOU</span>}
-                                    </span>
-                                    {rank === 1 && (
-                                        <span className="text-[9px] text-neuro-gold flex items-center gap-1">
-                                            <Crown size={10} /> KING
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="text-right">
-                            <div className="font-mono font-bold text-sm text-white">
-                                {Math.floor(miner.balance).toLocaleString()}
-                            </div>
-                            <div className="text-[9px] font-bold text-slate-500">NRC</div>
-                        </div>
-                    </div>
-                  );
-              })}
-              
-              {/* If user is not in top 10, show a separator and their rank */}
-              {!topMiners.find(m => m.isUser) && (
-                  <>
-                    <div className="flex justify-center my-1">
-                        <div className="w-1 h-1 bg-slate-600 rounded-full mx-1"></div>
-                        <div className="w-1 h-1 bg-slate-600 rounded-full mx-1"></div>
-                        <div className="w-1 h-1 bg-slate-600 rounded-full mx-1"></div>
-                    </div>
-                    {globalStats.leaderboard.filter(m => m.isUser).map(me => (
-                        <div key="me-sticky" className="relative flex items-center justify-between p-3 rounded-xl border bg-neuro-cyan/10 border-neuro-cyan text-neuro-cyan shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-                             <div className="flex items-center gap-3">
-                                <div className="w-6 h-6 rounded-full bg-neuro-cyan text-black flex items-center justify-center font-bold text-xs font-mono">
-                                    {me.rank}
-                                </div>
-                                <span className="text-xs font-bold text-white">You</span>
-                             </div>
-                             <div className="text-right">
-                                <div className="font-mono font-bold text-sm text-white">{Math.floor(me.balance).toLocaleString()}</div>
-                             </div>
-                        </div>
-                    ))}
-                  </>
-              )}
-          </div>
-      );
-  };
 
   return (
     <div className="flex flex-col gap-6 animate-fadeIn p-4 pb-32">
@@ -525,14 +421,55 @@ const Investments: React.FC<InvestmentsProps> = ({ playerState, globalStats }) =
           </div>
       </div>
 
-      {/* --- SECTION 3: TOP MINERS (GLOBAL LEADERBOARD) --- */}
+      {/* --- SECTION 3: TOP MINERS (SOLO) --- */}
       <div>
          <div className="flex items-center gap-2 mb-3 px-1">
             <Trophy className="text-neuro-gold" size={18} />
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">{t('invest.topMiners')}</h3>
          </div>
          
-         {renderLeaderboard()}
+         {/* The Player Row (Rank 1) */}
+         <div className="glass-card rounded-xl border border-neuro-gold/50 bg-neuro-gold/5 relative overflow-hidden">
+             <div className="absolute left-0 top-0 bottom-0 w-1 bg-neuro-gold shadow-[0_0_10px_#FFB800]"></div>
+             
+             <div className="grid grid-cols-12 gap-2 p-4 items-center">
+                 <div className="col-span-2">
+                     <div className="w-6 h-6 rounded-full bg-neuro-gold flex items-center justify-center text-black font-bold font-mono text-xs shadow-[0_0_10px_#FFB800]">
+                         1
+                     </div>
+                 </div>
+                 <div className="col-span-6 flex items-center gap-3">
+                     <div className="w-8 h-8 rounded-full bg-black border border-neuro-gold/30 overflow-hidden shrink-0">
+                         {user?.photo_url ? (
+                             <img src={user.photo_url} alt="User" className="w-full h-full object-cover" />
+                         ) : (
+                             <div className="w-full h-full flex items-center justify-center bg-neuro-gold/20">
+                                 <UserCircle2 size={16} className="text-neuro-gold" />
+                             </div>
+                         )}
+                     </div>
+                     <div className="flex flex-col">
+                         <span className="text-xs font-bold text-white leading-none mb-0.5 truncate max-w-[100px] flex items-center gap-1">
+                             {user?.first_name || 'Pilot'} {t('invest.you')}
+                             {highestBadge && (
+                                <div className="flex items-center justify-center w-4 h-4 rounded-full bg-white/10 border border-white/20">
+                                    {headerIconMap[highestBadge.icon]}
+                                </div>
+                             )}
+                         </span>
+                         <span className="text-[9px] text-neuro-gold flex items-center gap-1">
+                             <ShieldCheck size={10} /> {t('invest.nodeActive')}
+                         </span>
+                     </div>
+                 </div>
+                 <div className="col-span-4 text-right">
+                     <div className="text-sm font-mono font-bold text-white leading-none">
+                         {Math.floor(playerState.balance).toLocaleString()}
+                     </div>
+                     <div className="text-[9px] text-slate-400 font-bold mt-0.5">NRC</div>
+                 </div>
+             </div>
+         </div>
       </div>
 
     </div>

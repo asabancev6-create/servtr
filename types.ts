@@ -42,6 +42,7 @@ export interface Upgrade {
   // For Limited Items
   globalLimit?: number; 
   globalSold?: number;
+  duration?: number; // For premium items
 }
 
 export interface CollectionItem {
@@ -100,6 +101,7 @@ export interface PlayerState {
   lastDailyRewardClaim: number; // Timestamp
   dailyStreak: number; 
   completedQuestIds: string[];
+  redeemedCodes?: string[];
   
   // New Achievement Tracking
   achievements: Record<string, AchievementProgress>;
@@ -129,15 +131,6 @@ export interface PricePoint {
   price: number;
 }
 
-export interface LeaderboardEntry {
-  id: number | string;
-  name: string;
-  balance: number;
-  isUser: boolean;
-  avatar?: string;
-  rank?: number;
-}
-
 export interface GlobalStats {
   totalUsers: number;
   totalMined: number;
@@ -146,7 +139,7 @@ export interface GlobalStats {
   // BLOCKCHAIN CORE (Shared across all users)
   blockHeight: number;
   currentDifficulty: number;
-  currentBlockHash: number; // Current progress in the block
+  currentBlockHash: number; // Current progress in the block (Pool Hashrate Accumulator)
   lastBlockTime: number; // Timestamp of last block close
   epochStartTime: number; // NEW: Timestamp of when the current 1300-block epoch started
   
@@ -162,12 +155,9 @@ export interface GlobalStats {
   rewardPoolTon: number;   // 10% of Shop Purchases + 90% of Game Losses
   rewardPoolStars: number; // 90% of Game Losses (Stars are virtual here mostly)
   
-  marketPoolNrc: number; // DEPRECATED
   currentPrice: number; // Calculated Price
   priceHistory: PricePoint[]; // NEW: Historical data for chart
   
-  leaderboard: LeaderboardEntry[]; // GLOBAL LEADERBOARD
-
   // Admin Config
   rewardConfig: RewardConfig;
   exchangeConfig: ExchangeConfig; // NEW: Admin controlled limits
@@ -234,6 +224,7 @@ export interface TelegramWebApp {
   ready: () => void;
   expand: () => void;
   close: () => void;
+  enableClosingConfirmation: () => void;
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
   openInvoice: (url: string, callback?: (status: string) => void) => void; 
