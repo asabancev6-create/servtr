@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { PlayerState, GlobalStats, TelegramUser } from '../types';
 import { ACHIEVEMENTS, formatHashValue, calculateLevel } from '../constants';
@@ -149,8 +148,8 @@ const Profile: React.FC<ProfileProps> = ({ playerState, globalStats, onExchange,
       setInputAmount('');
   };
 
-  const handlePayBill = async () => {
-      const res = await GameService.payElectricity(playerState);
+  const handlePayBill = () => {
+      const res = GameService.payElectricity(playerState);
       if (res.success && res.newState) {
           // Since Profile only calls props, we need a way to update parent. 
           // The cleanest way is to trigger an action or refresh. 

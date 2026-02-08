@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerState, GlobalStats } from '../types';
 import { Dices, Trophy, Coins, Sparkles, Zap, ArrowLeft, Disc, Target, Lock, Play, Gem, Hexagon, Triangle, Circle, Star, Skull, FlaskConical, Atom, Wallet, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Rocket, ArrowUpRight } from 'lucide-react';
@@ -52,10 +51,10 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
     const [history, setHistory] = useState<number[]>([1.45, 2.10, 1.05, 5.42, 1.88, 12.50]); // Initial dummy history
 
     const crashPointRef = useRef(0);
-    const animationRef = useRef<number>(0);
+    const animationRef = useRef<number>();
     const startTimeRef = useRef(0);
 
-    const startGame = async () => {
+    const startGame = () => {
         const bet = parseFloat(betAmount);
         if (isNaN(bet) || bet <= 0) { alert(t('games.invalid_bet')); return; }
         
@@ -64,7 +63,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         if (currency === 'TON' && playerState.tonBalance < bet) { alert(t('games.insufficient_funds')); return; }
         if (currency === 'STARS' && playerState.starsBalance < bet) { alert(t('games.insufficient_funds')); return; }
         
-        const res = await GameService.startCrashGame(playerState, bet, currency);
+        const res = GameService.startCrashGame(playerState, bet, currency);
         if (res.success && res.newState && res.crashPoint) {
             onUpdate(res.newState); // Deduct bet immediately
             onRefreshGlobal();
@@ -107,7 +106,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         }
     };
 
-    const cashOut = async () => {
+    const cashOut = () => {
         if (!userInGame || crashed) return;
         
         // 1. Mark user as exited, but DO NOT stop animation
@@ -119,7 +118,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         setWinAmount(win);
         
         // 2. Secure funds backend
-        const res = await GameService.cashOutCrashGame(playerState, bet, multiplier, currency);
+        const res = GameService.cashOutCrashGame(playerState, bet, multiplier, currency);
         if (res.success && res.newState) {
             onUpdate(res.newState);
             onRefreshGlobal();
@@ -309,8 +308,8 @@ const NeonDice: React.FC<GamesProps & { onBack: () => void, currency: Currency }
         }, 80);
     };
 
-    const finishRoll = async (bet: number, prediction: 'low' | 'seven' | 'high') => {
-        const result = await GameService.playNeonDice(playerState, bet, currency, prediction);
+    const finishRoll = (bet: number, prediction: 'low' | 'seven' | 'high') => {
+        const result = GameService.playNeonDice(playerState, bet, currency, prediction);
 
         if (result.success && result.newState && result.dice) {
             setDice(result.dice);
@@ -479,8 +478,8 @@ const CyberSpin: React.FC<GamesProps & { onBack: () => void, currency: Currency 
         }, 80);
     };
 
-    const finishSpin = async (bet: number) => {
-        const result = await GameService.playCyberSpin(playerState, bet, currency);
+    const finishSpin = (bet: number) => {
+        const result = GameService.playCyberSpin(playerState, bet, currency);
         
         if (result.success && result.newState && result.resultItem) {
             onUpdate(result.newState);
@@ -687,8 +686,8 @@ const QuantumSlots: React.FC<GamesProps & { onBack: () => void, currency: Curren
         }, 100);
     };
   
-    const finishSpin = async (bet: number) => {
-        const result = await GameService.playQuantumSlots(playerState, bet, currency);
+    const finishSpin = (bet: number) => {
+        const result = GameService.playQuantumSlots(playerState, bet, currency);
         
         if (result.success && result.newState && result.result) {
             setReels(result.result);
@@ -982,24 +981,25 @@ const Games: React.FC<GamesProps> = (props) => {
                     onClick={() => setActiveGame('dice')}
                     className={`group relative glass-card p-0 rounded-2xl overflow-hidden text-left transition-all hover:border-opacity-100 hover:scale-[1.01] active:scale-[0.99] border border-white/5 hover:${config.border}`}
                 >
-                    <div className={`absolute inset-0 bg-gradient-to-r ${config.bg} to-transparent opacity-0 group-hover:opacity-10 transition-opacity`}></div>
+                     <div className={`absolute inset-0 bg-gradient-to-r ${config.bg} to-transparent opacity-0 group-hover:opacity-10 transition-opacity`}></div>
                     
                     <div className="flex items-center gap-4 p-4">
-                        <div className={`w-16 h-16 rounded-xl bg-opacity-20 border border-opacity-50 flex items-center justify-center transition-shadow ${config.bg} ${config.border} shadow-[0_0_15px_rgba(0,0,0,0.5)]`}>
-                            <Dices size={32} className={config.color} />
-                        </div>
-                        <div className="flex-1">
-                            <h4 className={`text-lg font-bold text-white mb-1 group-hover:${config.color} transition-colors`}>{t('games.dice_title')}</h4>
-                            <p className="text-xs text-slate-400 mb-2">Classic dice roll prediction.</p>
+                         <div className={`w-16 h-16 rounded-xl bg-opacity-20 border border-opacity-50 flex items-center justify-center transition-shadow ${config.bg} ${config.border} shadow-[0_0_15px_rgba(0,0,0,0.5)]`}>
+                            <Dice5 size={32} className={config.color} />
+                         </div>
+                         <div className="flex-1">
+                            <h4 className={`text-lg font-bold text-white mb-1 group-hover:${config.color} transition-colors`}>Neon Dice</h4>
+                            <p className="text-xs text-slate-400 mb-2">Predict High, Low or 7.</p>
                             <div className="flex items-center gap-2">
-                                <span className={`text-[9px] font-bold text-slate-300 border border-white/20 px-2 py-0.5 rounded`}>CASUAL</span>
+                                <span className={`text-[9px] font-bold text-slate-300 border border-white/20 px-2 py-0.5 rounded`}>PROBABLY FAIR</span>
                             </div>
-                        </div>
-                        <div className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:${config.bg} group-hover:text-black transition-colors`}>
+                         </div>
+                         <div className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:${config.bg} group-hover:text-black transition-colors`}>
                             <Play size={14} className="ml-0.5" />
                         </div>
                     </div>
                 </button>
+
             </div>
         </div>
     </div>

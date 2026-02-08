@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { COLLECTIONS } from '../constants';
 import { Box, Key, Brain, Cpu, Lock, Gem, CheckCircle2, Clipboard, Share2, Users, Coins, Gift, Calendar, ArrowRight, AlertTriangle, Clock, Atom } from 'lucide-react';
@@ -66,10 +65,10 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
     return () => clearInterval(interval);
   }, [playerState.lastDailyRewardClaim]); // Depend on prop changes
 
-  const handleClaimDaily = async () => {
+  const handleClaimDaily = () => {
     if (!globalStats) return;
     
-    const result = await GameService.claimDailyReward(playerState);
+    const result = GameService.claimDailyReward(playerState);
     if (result.success && result.newState) {
         onUpdate(result.newState); // Notify parent immediately
         setDailyReady(false);
@@ -87,14 +86,14 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
     }
   };
 
-  const handleQuestAction = async (quest: Quest) => {
+  const handleQuestAction = (quest: Quest) => {
       // Re-check quest condition manually in case UI is stale
       if (quest.type === 'check' || quest.type === 'game') {
            if (quest.condition && !quest.condition(playerState)) return;
       }
       
-      const performComplete = async () => {
-          const result = await GameService.completeQuest(playerState, quest.id, quest.reward);
+      const performComplete = () => {
+          const result = GameService.completeQuest(playerState, quest.id, quest.reward);
              if (result.success && result.newState) {
                 onUpdate(result.newState); // Notify parent immediately
                 if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -111,7 +110,7 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
           window.open(quest.link, '_blank');
           setTimeout(performComplete, 2000);
       } else {
-          await performComplete();
+          performComplete();
       }
   };
 
