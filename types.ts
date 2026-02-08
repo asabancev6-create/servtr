@@ -1,4 +1,5 @@
 
+
 export enum Tab {
   MINER = 'MINER',
   INVEST = 'INVEST',
@@ -129,6 +130,12 @@ export interface PricePoint {
   price: number;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  balance: number;
+}
+
 export interface GlobalStats {
   totalUsers: number;
   totalMined: number;
@@ -156,7 +163,8 @@ export interface GlobalStats {
   marketPoolNrc: number; // DEPRECATED
   currentPrice: number; // Calculated Price
   priceHistory: PricePoint[]; // NEW: Historical data for chart
-  
+  leaderboard: LeaderboardEntry[]; // NEW: Leaderboard
+
   // Admin Config
   rewardConfig: RewardConfig;
   exchangeConfig: ExchangeConfig; // NEW: Admin controlled limits
