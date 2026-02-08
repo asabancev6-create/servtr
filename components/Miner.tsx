@@ -137,6 +137,7 @@ const Miner: React.FC<MinerProps> = ({ playerState, globalStats, onMine }) => {
              className="w-full h-full relative preserve-3d transition-transform duration-100 ease-out"
              style={{ transform: isClicking ? 'scale3d(0.9, 0.9, 0.9)' : 'scale3d(1, 1, 1)' }}
           >
+            
             {/* Core Sphere */}
             <div className={`absolute inset-[15%] rounded-full bg-radial-gradient from-neuro-cyan via-[#2a0044] to-black shadow-[inset_0_0_30px_rgba(0,240,255,0.5)] border-2 border-neuro-cyan/30 flex items-center justify-center overflow-hidden transition-all duration-100 ${isClicking ? 'brightness-150 shadow-[0_0_50px_rgba(0,240,255,0.6)]' : ''}`}>
                  <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30 mix-blend-overlay"></div>
@@ -147,38 +148,16 @@ const Miner: React.FC<MinerProps> = ({ playerState, globalStats, onMine }) => {
                  />
             </div>
 
-            {/* Rings */}
-            <div className="absolute inset-0 preserve-3d animate-gyro-x">
-                 <div className="absolute inset-0 rounded-full border-2 border-dashed border-neuro-violet/60 opacity-80"></div>
-                 <div className="absolute inset-0 animate-[spin_2s_linear_infinite]">
-                     <div className="absolute -top-[3px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_15px_white,0_0_30px_#8D73FF]"></div>
-                 </div>
+            {/* Etherial Rings (Magical Fields) */}
+            <div className="absolute inset-0 preserve-3d animate-gyro-x opacity-40">
+                 <div className="absolute inset-0 rounded-full border border-neuro-violet/40 shadow-[0_0_20px_rgba(141,115,255,0.2)]"></div>
             </div>
 
-            <div className="absolute inset-4 preserve-3d animate-gyro-y">
-                 <div className="absolute inset-0 rounded-full border-[3px] border-solid border-neuro-cyan/50 shadow-[0_0_15px_rgba(0,240,255,0.4)]"></div>
+            <div className="absolute inset-4 preserve-3d animate-gyro-y opacity-30">
+                 <div className="absolute inset-0 rounded-full border-2 border-dashed border-neuro-cyan/30"></div>
             </div>
 
-             <div className="absolute -inset-4 preserve-3d animate-gyro-z opacity-60 pointer-events-none">
-                 <div className="absolute inset-0 rounded-full border border-neuro-gold/40"></div>
-                 <div className="absolute bottom-0 right-1/2 translate-x-1/2 w-2 h-2 bg-neuro-gold rounded-full shadow-[0_0_10px_#FFB800]"></div>
-            </div>
-
-            <div className="absolute inset-2 preserve-3d animate-gyro-diag-a opacity-80 pointer-events-none">
-                 <div className="absolute inset-0 rounded-full border-2 border-neuro-pink/30"></div>
-                 <div className="absolute inset-0 animate-spin-reverse">
-                    <div className="absolute top-1/2 right-0 translate-x-1/2 w-2.5 h-2.5 bg-neuro-pink rounded-full shadow-[0_0_10px_#FF00E5]"></div>
-                 </div>
-            </div>
-
-            <div className="absolute -inset-2 preserve-3d animate-gyro-diag-b opacity-40 pointer-events-none">
-                 <div className="absolute inset-0 rounded-full border border-dotted border-white/50"></div>
-                 <div className="absolute inset-0 animate-[spin_1.5s_linear_infinite]">
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 rounded-full blur-[1px]"></div>
-                 </div>
-            </div>
-            
-            <div className={`absolute inset-0 rounded-full border-4 border-white opacity-0 transition-all duration-300 ${isClicking ? 'scale-125 opacity-100' : 'scale-100 opacity-0'}`}></div>
+            <div className={`absolute inset-0 rounded-full border-2 border-white opacity-0 transition-all duration-300 ${isClicking ? 'scale-110 opacity-60 blur-sm' : 'scale-100 opacity-0'}`}></div>
 
           </div>
         </div>
