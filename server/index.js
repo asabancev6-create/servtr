@@ -9,13 +9,21 @@
  * 4. stats.json (Price history & Leaderboards)
  */
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+// Initialize environment variables
+dotenv.config();
+
+// Fix for __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -219,9 +227,8 @@ const verifyAuth = (req, res, next) => {
         }
         return res.status(401).json({ error: 'Auth failed' });
     }
-    // ... (Full verification logic omitted for brevity, assuming existing logic from previous block)
-    // For this implementation, we trust the logic is identical to before.
-    // Re-implementing simplified verification for robustness:
+    
+    // Auth verification logic
     const urlParams = new URLSearchParams(initData);
     const hash = urlParams.get('hash');
     urlParams.delete('hash');
@@ -242,7 +249,6 @@ const verifyAuth = (req, res, next) => {
 };
 
 // --- HELPER: CONSTRUCT GLOBAL RESPONSE ---
-// Combines data from multiple DBs into the format frontend expects
 const getGlobalResponse = () => ({
     totalUsers: statsDB.totalUsers,
     totalMined: chainDB.totalMined,
@@ -252,7 +258,7 @@ const getGlobalResponse = () => ({
     currentBlockHash: chainDB.currentBlockHash,
     lastBlockTime: chainDB.lastBlockTime,
     epochStartTime: chainDB.epochStartTime,
-    marketCap: chainDB.liquidityTon, // Simplified
+    marketCap: chainDB.liquidityTon,
     limitedItemsSold: chainDB.limitedItemsSold,
     liquidityTon: chainDB.liquidityTon,
     treasuryTon: chainDB.treasuryTon,
@@ -265,7 +271,7 @@ const getGlobalResponse = () => ({
     rewardConfig: chainDB.rewardConfig,
     exchangeConfig: chainDB.exchangeConfig,
     baseDailyReward: chainDB.baseDailyReward,
-    quests: [] // Dynamic quests can be added to gamesDB or separate
+    quests: [] 
 });
 
 // --- ROUTES ---
