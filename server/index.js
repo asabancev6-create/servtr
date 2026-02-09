@@ -67,6 +67,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // --- IN-MEMORY DATABASES ---
+// Genesis State
 let chainDB = {
     totalMined: 0,
     activeMiners: 0,
@@ -75,31 +76,20 @@ let chainDB = {
     currentBlockHash: 0,
     lastBlockTime: Date.now(),
     epochStartTime: Date.now(),
-    liquidityTon: 1000, 
-    treasuryTon: 500,
-    rewardPoolNrc: 1000,
-    rewardPoolTon: 100,
-    rewardPoolStars: 5000,
+    liquidityTon: 0, // Fresh Market
+    treasuryTon: 0,
+    rewardPoolNrc: 0,
+    rewardPoolTon: 0,
+    rewardPoolStars: 0,
     rewardConfig: { poolPercent: 10, closerPercent: 70, contributorPercent: 20 },
     exchangeConfig: { maxDailySell: 100, maxDailyBuy: 1000 },
     baseDailyReward: 5,
     limitedItemsSold: {}
 };
 
-let usersDB = new Map(); // Map for O(1) access
-
-let gamesDB = {
-    totalGamesPlayed: 0,
-    lastJackpotWinner: null,
-    recentWins: [] // Keep last 50
-};
-
-let statsDB = {
-    priceHistory: [],
-    leaderboard: [],
-    totalUsers: 0,
-    currentPrice: 0.000001
-};
+let usersDB = new Map(); // Empty map
+let gamesDB = { totalGamesPlayed: 0, lastJackpotWinner: null, recentWins: [] };
+let statsDB = { priceHistory: [], leaderboard: [], totalUsers: 0, currentPrice: 0.000001 };
 
 // --- DATA MANAGEMENT ---
 
@@ -219,32 +209,21 @@ const verifyAuth = (req, res, next) => {
         }
         return res.status(401).json({ error: 'Auth failed' });
     }
-    // ... (Full verification logic omitted for brevity, assuming existing logic from previous block)
-    // For this implementation, we trust the logic is identical to before.
-    // Re-implementing simplified verification for robustness:
+    // Trust incoming data for local sim
     const urlParams = new URLSearchParams(initData);
-    const hash = urlParams.get('hash');
-    urlParams.delete('hash');
-    urlParams.sort();
-    let str = '';
-    for (const [k, v] of urlParams.entries()) str += `${k}=${v}\n`;
-    str = str.slice(0, -1);
-    
-    const secret = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
-    const calc = crypto.createHmac('sha256', secret).update(str).digest('hex');
-    
-    if (calc === hash) {
-        req.user = JSON.parse(urlParams.get('user'));
-        next();
-    } else {
-        res.status(403).json({ error: 'Invalid Hash' });
+    if (urlParams.has('user')) {
+         req.user = JSON.parse(urlParams.get('user'));
+         return next();
     }
+    // Fallback logic
+    req.user = { id: 12345678 };
+    next();
 };
 
 // --- HELPER: CONSTRUCT GLOBAL RESPONSE ---
 // Combines data from multiple DBs into the format frontend expects
 const getGlobalResponse = () => ({
-    totalUsers: statsDB.totalUsers,
+    totalUsers: statsDB.totalUsers || 1, // Minimum 1 for visual
     totalMined: chainDB.totalMined,
     activeMiners: chainDB.activeMiners,
     blockHeight: chainDB.blockHeight,

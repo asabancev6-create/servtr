@@ -66,7 +66,7 @@ class ApiService {
           (e instanceof TypeError)
       ) {
           if (!this.offlineMode) {
-              console.warn(`[Backend Offline] Could not reach ${API_URL}. Switching to Local Mock Mode.`);
+              console.warn(`[Backend Offline] Could not reach ${API_URL}. Switching to Local Mock Mode (Genesis State).`);
               this.offlineMode = true;
           }
           return this.mockResponse(endpoint, methodInput, body);
@@ -84,9 +84,8 @@ class ApiService {
           return { user: this.lastKnownState, global: this.getGlobalStats(0) };
       }
       if (endpoint === '/sync') {
-          // Increment mock global stats slightly to show activity
+          // In Genesis mode, we don't increment automatically to keep it "fresh" until interaction
           const stats = this.getGlobalStats(0);
-          stats.totalMined += Math.random() * 10;
           return stats;
       }
       if (endpoint === '/mine') {
@@ -115,30 +114,35 @@ class ApiService {
     return INITIAL_STATE;
   }
 
-  // Synchronous placeholder
+  // Synchronous placeholder - GENESIS STATE
   getGlobalStats(balance: number): GlobalStats {
-    // Generate a slightly dynamic placeholder
     const now = Date.now();
     return {
-        totalUsers: 1337, 
-        totalMined: 5000000 + (now % 10000), 
-        activeMiners: 42, 
-        blockHeight: Math.floor(now / 100000), 
+        totalUsers: 1, // You are the only one
+        totalMined: 0, 
+        activeMiners: 1, 
+        blockHeight: 0, 
         currentDifficulty: 36000,
-        currentBlockHash: (now % 36000), 
-        lastBlockTime: now - (now % 5000), 
-        epochStartTime: now - 100000, 
-        marketCap: 250000, 
+        currentBlockHash: 0, 
+        lastBlockTime: 0, 
+        epochStartTime: now, 
+        marketCap: 0, 
         limitedItemsSold: {},
-        liquidityTon: 5000, 
-        treasuryTon: 1000, 
-        rewardPoolNrc: 20000, 
-        rewardPoolTon: 500, 
-        rewardPoolStars: 10000,
+        liquidityTon: 0, 
+        treasuryTon: 0, 
+        rewardPoolNrc: 100, // Small seed 
+        rewardPoolTon: 0, 
+        rewardPoolStars: 0,
         marketPoolNrc: 0,
         currentPrice: 0.000001, 
-        priceHistory: Array.from({length: 20}, (_, i) => ({ time: now - i*3600000, price: 0.000001 + Math.random()*0.0000005 })), 
-        leaderboard: [],
+        priceHistory: [], // No history
+        leaderboard: [{
+            id: '1',
+            name: 'Pilot (You)',
+            balance: balance || 0,
+            rank: 1,
+            isUser: true
+        }],
         rewardConfig: { poolPercent: 10, closerPercent: 70, contributorPercent: 20 },
         exchangeConfig: { maxDailySell: 100, maxDailyBuy: 1000 },
         baseDailyReward: 5, 

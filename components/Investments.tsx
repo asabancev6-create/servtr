@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, TooltipProps, CartesianGrid, ComposedChart, Line, ReferenceLine } from 'recharts';
 import { PlayerState, GlobalStats, TelegramUser } from '../types';
@@ -143,8 +144,13 @@ const Investments: React.FC<InvestmentsProps> = ({ playerState, globalStats }) =
       // Filter Data
       const filtered = rawHistory.filter(p => p.time >= cutoffTime);
       
-      // If no data (shouldn't happen with backfill), show at least current
-      if (filtered.length === 0 && rawHistory.length > 0) {
+      // If no data (Genesis), show flat line at 0.000001
+      if (filtered.length === 0) {
+          // Fill with genesis flat line
+          for(let i=0; i<10; i++) {
+            filtered.push({ time: now - (10-i)*60000, price: 0.000001 });
+          }
+      } else if (filtered.length === 0 && rawHistory.length > 0) {
           filtered.push(rawHistory[rawHistory.length - 1]);
       }
 
@@ -203,7 +209,7 @@ const Investments: React.FC<InvestmentsProps> = ({ playerState, globalStats }) =
                 <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div 
                     className="h-full bg-gradient-to-r from-neuro-violet via-neuro-pink to-neuro-cyan relative transition-all duration-1000 ease-out"
-                    style={{ width: `${emissionPercent}%` }}
+                    style={{ width: `${Math.max(0.5, emissionPercent)}%` }}
                 >
                     <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-white shadow-[0_0_10px_white]"></div>
                 </div>
