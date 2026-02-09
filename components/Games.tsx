@@ -54,7 +54,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
     const animationRef = useRef<number>();
     const startTimeRef = useRef(0);
 
-    const startGame = () => {
+    const startGame = async () => {
         const bet = parseFloat(betAmount);
         if (isNaN(bet) || bet <= 0) { alert(t('games.invalid_bet')); return; }
         
@@ -63,7 +63,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         if (currency === 'TON' && playerState.tonBalance < bet) { alert(t('games.insufficient_funds')); return; }
         if (currency === 'STARS' && playerState.starsBalance < bet) { alert(t('games.insufficient_funds')); return; }
         
-        const res = GameService.startCrashGame(playerState, bet, currency);
+        const res = await GameService.startCrashGame(playerState, bet, currency);
         if (res.success && res.newState && res.crashPoint) {
             onUpdate(res.newState); // Deduct bet immediately
             onRefreshGlobal();
@@ -106,7 +106,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         }
     };
 
-    const cashOut = () => {
+    const cashOut = async () => {
         if (!userInGame || crashed) return;
         
         // 1. Mark user as exited, but DO NOT stop animation
@@ -118,7 +118,7 @@ const NeuroCrash: React.FC<GamesProps & { onBack: () => void, currency: Currency
         setWinAmount(win);
         
         // 2. Secure funds backend
-        const res = GameService.cashOutCrashGame(playerState, bet, multiplier, currency);
+        const res = await GameService.cashOutCrashGame(playerState, bet, multiplier, currency);
         if (res.success && res.newState) {
             onUpdate(res.newState);
             onRefreshGlobal();
@@ -308,8 +308,8 @@ const NeonDice: React.FC<GamesProps & { onBack: () => void, currency: Currency }
         }, 80);
     };
 
-    const finishRoll = (bet: number, prediction: 'low' | 'seven' | 'high') => {
-        const result = GameService.playNeonDice(playerState, bet, currency, prediction);
+    const finishRoll = async (bet: number, prediction: 'low' | 'seven' | 'high') => {
+        const result = await GameService.playNeonDice(playerState, bet, currency, prediction);
 
         if (result.success && result.newState && result.dice) {
             setDice(result.dice);
@@ -478,8 +478,8 @@ const CyberSpin: React.FC<GamesProps & { onBack: () => void, currency: Currency 
         }, 80);
     };
 
-    const finishSpin = (bet: number) => {
-        const result = GameService.playCyberSpin(playerState, bet, currency);
+    const finishSpin = async (bet: number) => {
+        const result = await GameService.playCyberSpin(playerState, bet, currency);
         
         if (result.success && result.newState && result.resultItem) {
             onUpdate(result.newState);
@@ -686,8 +686,8 @@ const QuantumSlots: React.FC<GamesProps & { onBack: () => void, currency: Curren
         }, 100);
     };
   
-    const finishSpin = (bet: number) => {
-        const result = GameService.playQuantumSlots(playerState, bet, currency);
+    const finishSpin = async (bet: number) => {
+        const result = await GameService.playQuantumSlots(playerState, bet, currency);
         
         if (result.success && result.newState && result.result) {
             setReels(result.result);

@@ -65,10 +65,10 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
     return () => clearInterval(interval);
   }, [playerState.lastDailyRewardClaim]); // Depend on prop changes
 
-  const handleClaimDaily = () => {
+  const handleClaimDaily = async () => {
     if (!globalStats) return;
     
-    const result = GameService.claimDailyReward(playerState);
+    const result = await GameService.claimDailyReward(playerState);
     if (result.success && result.newState) {
         onUpdate(result.newState); // Notify parent immediately
         setDailyReady(false);
@@ -77,8 +77,9 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
         }
         alert(`+${Math.floor(result.reward || 0)} NRC!`);
     } else {
-        if (result.error === 'POOL EMPTY') alert(t('collections.pool_empty'));
-        else if (result.error === 'COOLDOWN') alert(t('collections.come_back'));
+        if (result.message === 'POOL EMPTY') alert(t('collections.pool_empty'));
+        else if (result.message === 'Cooldown') alert(t('collections.come_back'));
+        else if (result.message) alert(result.message);
         
         if (window.Telegram?.WebApp?.HapticFeedback) {
             window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
@@ -92,8 +93,8 @@ const Collections: React.FC<CollectionsProps> = ({ playerState, onUpdate }) => {
            if (quest.condition && !quest.condition(playerState)) return;
       }
       
-      const performComplete = () => {
-          const result = GameService.completeQuest(playerState, quest.id, quest.reward);
+      const performComplete = async () => {
+          const result = await GameService.completeQuest(playerState, quest.id, quest.reward);
              if (result.success && result.newState) {
                 onUpdate(result.newState); // Notify parent immediately
                 if (window.Telegram?.WebApp?.HapticFeedback) {

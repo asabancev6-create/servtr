@@ -129,6 +129,14 @@ export interface PricePoint {
   price: number;
 }
 
+export interface LeaderboardEntry {
+    id: string;
+    name: string;
+    balance: number;
+    rank: number;
+    isUser: boolean;
+}
+
 export interface GlobalStats {
   totalUsers: number;
   totalMined: number;
@@ -157,6 +165,9 @@ export interface GlobalStats {
   currentPrice: number; // Calculated Price
   priceHistory: PricePoint[]; // NEW: Historical data for chart
   
+  // Leaderboard
+  leaderboard: LeaderboardEntry[];
+
   // Admin Config
   rewardConfig: RewardConfig;
   exchangeConfig: ExchangeConfig; // NEW: Admin controlled limits

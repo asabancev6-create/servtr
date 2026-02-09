@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PlayerState, GlobalStats, Tab } from './types';
 import { GameService } from './services/mockBackend';
@@ -22,16 +23,25 @@ const GameContent: React.FC = () => {
   const stateRef = useRef(playerState);
   const globalStatsRef = useRef(globalStats);
 
-  // Initialize
+  // Initialize ASYNC to avoid Promise error
   useEffect(() => {
-    const loaded = GameService.loadState();
-    setPlayerState(loaded);
-    stateRef.current = loaded;
-    
-    // Initial fetch of global stats to ensure UI is in sync
-    const gStats = GameService.getGlobalStats(loaded.balance);
-    setGlobalStats(gStats);
-    globalStatsRef.current = gStats;
+    const init = async () => {
+        try {
+            const loaded = await GameService.loadState();
+            setPlayerState(loaded);
+            stateRef.current = loaded;
+            
+            // Fetch real global stats from server
+            const gStats = await GameService.fetchGlobal();
+            if (gStats) {
+                setGlobalStats(gStats);
+                globalStatsRef.current = gStats;
+            }
+        } catch (e) {
+            console.error("Init failed", e);
+        }
+    };
+    init();
   }, []);
 
   // --- CORE MINING ENGINE (SHARED LEDGER) ---
@@ -43,10 +53,8 @@ const GameContent: React.FC = () => {
         if (window.Telegram?.WebApp?.HapticFeedback) {
              window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
-        // Immediately fetch updated global stats to show new block height/difficulty
-        const gStats = GameService.getGlobalStats(newPlayerState.balance);
-        setGlobalStats(gStats);
-        globalStatsRef.current = gStats;
+        // Force refresh globals
+        fetchGlobal();
     }
 
     return newPlayerState;
@@ -81,10 +89,12 @@ const GameContent: React.FC = () => {
   }, []);
 
   // Global Stats Fetch Loop (Sync with "Network")
-  const fetchGlobal = () => {
-    const stats = GameService.getGlobalStats(stateRef.current.balance);
-    setGlobalStats(stats);
-    globalStatsRef.current = stats; 
+  const fetchGlobal = async () => {
+    const stats = await GameService.fetchGlobal();
+    if (stats) {
+        setGlobalStats(stats);
+        globalStatsRef.current = stats; 
+    }
   };
 
   useEffect(() => {
@@ -108,8 +118,8 @@ const GameContent: React.FC = () => {
       GameService.saveState(newState); 
   };
 
-  const handlePurchase = (id: string, currency: 'TON' | 'NRC' = 'TON') => {
-    const result = GameService.purchaseUpgrade(stateRef.current, id, currency);
+  const handlePurchase = async (id: string, currency: 'TON' | 'NRC' = 'TON') => {
+    const result = await GameService.purchaseUpgrade(stateRef.current, id, currency);
     
     if (result.success && result.newState) {
       handleStateUpdate(result.newState);
@@ -125,9 +135,9 @@ const GameContent: React.FC = () => {
     }
   };
   
-  const handleExchange = (amount: number, type: 'buy' | 'sell') => {
+  const handleExchange = async (amount: number, type: 'buy' | 'sell') => {
       if (amount <= 0) return;
-      const result = GameService.exchangeCurrency(stateRef.current, amount, type);
+      const result = await GameService.exchangeCurrency(stateRef.current, amount, type);
       
       if (result.success && result.newState) {
           handleStateUpdate(result.newState);
@@ -172,8 +182,8 @@ const GameContent: React.FC = () => {
   };
 
   // Claim Achievement
-  const handleClaimAchievement = (id: string) => {
-      const result = GameService.claimAchievementReward(stateRef.current, id);
+  const handleClaimAchievement = async (id: string) => {
+      const result = await GameService.claimAchievementReward(stateRef.current, id);
       if (result.success && result.newState) {
           handleStateUpdate(result.newState);
            if(window.Telegram?.WebApp?.HapticFeedback) {
